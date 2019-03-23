@@ -3,6 +3,7 @@ import logging
 import logging.config
 import logging.handlers
 import core_pb2_grpc
+import cartesi_base_pb2
 import traceback
 import grpc
 
@@ -58,6 +59,14 @@ def new_machine(session_id, address, machine_req):
         stub = core_pb2_grpc.MachineStub(channel)
         response = stub.Machine(machine_req)
         LOGGER.debug("Cartesi machine created for session_id '{}'".format(session_id))
+        
+def get_machine_hash(session_id, address):
+    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
+    with grpc.insecure_channel(address) as channel:
+        stub = core_pb2_grpc.MachineStub(channel)
+        response = stub.GetRootHash(cartesi_base_pb2.Void())
+        LOGGER.debug("Cartesi machine root hash retrieved for session_id '{}'".format(session_id))
+        return response
         
 #Initializing log
 LOGGER = get_new_logger(__name__)

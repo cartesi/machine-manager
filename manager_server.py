@@ -47,10 +47,10 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             self.session_registry.create_machine(session_id, machine_req)
 
             #calculate cartesi machine initial hash
+            initial_hash = self.session_registry.get_machine_root_hash(session_id)
 
             #Return the initial hash
-            return cartesi_base_pb2.Hash(
-                content=b'fake cartesi machine hash')
+            return initial_hash
     
         #No session with provided id
         except SessionIdException as e:
@@ -61,10 +61,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
         except Exception as e:
             LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))            
             context.set_details('An exception with message "{}" was raised!'.format(e))
-            context.set_code(grpc.StatusCode.UNKNOWN)
-            
-        
-        
+            context.set_code(grpc.StatusCode.UNKNOWN)   
 
     def SessionRun(self, request, context):
         return manager_high_pb2.SessinoRunResult()

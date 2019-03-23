@@ -73,6 +73,18 @@ class SessionRegistry:
             utils.new_machine(session_id, self.registry[session_id].address, machine_req)
             LOGGER.debug("Executed creating a new machine for session '{}'".format(session_id))
             
+    def get_machine_root_hash(self, session_id):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+        LOGGER.debug("Acquiring session '{}' registry lock".format(session_id))       
+        with self.registry[session_id].lock:
+            LOGGER.debug("Issuing server to get machine root hash for session '{}'".format(session_id))
+            root_hash = utils.get_machine_hash(session_id, self.registry[session_id].address)
+            LOGGER.debug("Executed getting machine root hash for session '{}'".format(session_id))
+            return root_hash
+            
 class CartesiSession:
     
     def __init__(self, session_id):
