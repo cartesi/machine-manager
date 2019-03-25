@@ -67,6 +67,14 @@ def get_machine_hash(session_id, address):
         response = stub.GetRootHash(cartesi_base_pb2.Void())
         LOGGER.debug("Cartesi machine root hash retrieved for session_id '{}'".format(session_id))
         return response
+    
+def create_machine_snapshot(session_id, address):
+    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
+    with grpc.insecure_channel(address) as channel:
+        stub = core_pb2_grpc.MachineStub(channel)
+        response = stub.Snapshot(cartesi_base_pb2.Void())
+        LOGGER.debug("Cartesi machine snapshot created for session_id '{}'".format(session_id))
+        return response
         
 #Initializing log
 LOGGER = get_new_logger(__name__)

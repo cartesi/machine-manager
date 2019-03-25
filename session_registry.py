@@ -10,7 +10,7 @@ class AddressException(Exception):
 class SessionIdException(Exception):
     pass
 
-class SessionRegistry:
+class SessionRegistryManager:
     
     def __init__(self):
         self.global_lock = Lock()
@@ -84,6 +84,23 @@ class SessionRegistry:
             root_hash = utils.get_machine_hash(session_id, self.registry[session_id].address)
             LOGGER.debug("Executed getting machine root hash for session '{}'".format(session_id))
             return root_hash
+        
+    def snapshot_machine(self, session_id):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+        LOGGER.debug("Acquiring session '{}' registry lock".format(session_id))       
+        with self.registry[session_id].lock:
+            LOGGER.debug("Issuing server to create machine snapshot for session '{}'".format(session_id))
+            utils.create_machine_snapshot(session_id, self.registry[session_id].address)
+            LOGGER.debug("Executed creating machine snapshot for session '{}'".format(session_id))
+            LOGGER.debug("Acquiring session registry global lock")
+            #Acquiring lock to write on session registry
+            with self.global_lock:
+                LOGGER.debug("Session registry global lock acquired")
+                self.registry[session_id].snapshot_time = self.registry[session_id].time
+                LOGGER.debug("Updated snapshot time of session {} to {}".format(session_id, self.registry[session_id].time))
             
 class CartesiSession:
     
@@ -92,6 +109,8 @@ class CartesiSession:
         self.lock = Lock()
         self.address = None
         self.address_set_event = Event()
+        self.time = 0
+        self.snapshot_time = None
     
             
             
