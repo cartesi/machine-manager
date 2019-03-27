@@ -54,13 +54,13 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             times = request.times
             LOGGER.info("New session run requested for session_id {} with times {}".format(session_id, times))
             
-            #Validate time values are valid
+            #Validate time values
             utils.validate_times(times)
 
             #Execute and return the session run result
             return self.session_registry_manager.run_session(session_id, times)
     
-        #No session with provided id or address issue
+        #No session with provided id, address issue, bad times provided or problem during rollback
         except (SessionIdException, AddressException, utils.TimeException, RollbackException) as e:
             LOGGER.error(e)
             context.set_details("{}".format(e))
@@ -72,7 +72,27 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             context.set_code(grpc.StatusCode.UNKNOWN)         
 
     def SessionStep(self, request, context):
-        return manager_high_pb2.SessionStepResult()
+        try:            
+            session_id = request.session_id
+            time = request.time
+            LOGGER.info("New session step requested for session_id {} with time {}".format(session_id, time))
+            
+            #Validate time value
+            utils.validate_times([time])
+
+            #Execute and return the session step result
+            return self.session_registry_manager.step_session(session_id, time)
+    
+        #No session with provided id, address issue, bad time provided or problem during rollback
+        except (SessionIdException, AddressException, utils.TimeException, RollbackException) as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Generic error catch
+        except Exception as e:
+            LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))            
+            context.set_details('An exception with message "{}" was raised!'.format(e))
+            context.set_code(grpc.StatusCode.UNKNOWN)           
 
 class _MachineManagerLow(manager_low_pb2_grpc.MachineManagerLowServicer):
 

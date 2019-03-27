@@ -4,6 +4,7 @@ import grpc
 import sys
 import os
 import time
+import datetime
 
 #So the cartesi GRPC modules are in path
 import sys
@@ -66,6 +67,9 @@ def make_new_session_request():
 def make_new_session_run_request(session_id, times):
     return manager_high_pb2.SessionRunRequest(session_id=session_id, times=times)
 
+def make_new_session_step_request(session_id, time):
+    return manager_high_pb2.SessionStepRequest(session_id=session_id, time=time)
+
 def address(add):
     #TODO: validate address
     return add
@@ -104,38 +108,93 @@ def run():
     with grpc.insecure_channel(conn_str) as channel:
         stub_low = manager_low_pb2_grpc.MachineManagerLowStub(channel)
         stub_high = manager_high_pb2_grpc.MachineManagerHighStub(channel)
-        try:           
+        try:
+            #NEW SESSION
+            print("\n\n\nNEW SESSION TESTS\n\n\n")
+            
             #Test new session
             print("Asking to create a new session")
-            responses.append(stub_high.NewSession(make_new_session_request()))
+            print("Server response:\n{}".format(stub_high.NewSession(make_new_session_request())))
+            
+            #RUN SESSION
+            print("\n\n\nRUN SESSION TESTS\n\n\n")
+            
             #Test run from pristine machine
             times = [1, 15, 30, 45, 60]
             print("Asking to run the machine for {} time(s) ({})".format(len(times),times))
             run_req = make_new_session_run_request(TEST_SESSION_ID, times)
-            responses.append(stub_high.SessionRun(run_req))
+            print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
             #Test run with first time < machine time and first time > snapshot time to force rollback
             times = [30, 35, 40, 45]
             print("Asking to run the machine for {} time(s) ({}), the 1st time forces a rollback".format(len(times),times))
             run_req = make_new_session_run_request(TEST_SESSION_ID, times)
-            responses.append(stub_high.SessionRun(run_req))
+            print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
             #Test run with first time < machine time and first time < snapshot time to force recreating machine
             times = [1, 5, 10]
             print("Asking to run the machine for {} time(s) ({}), the 1st time forces a recreating the machine".format(len(times),times))
             run_req = make_new_session_run_request(TEST_SESSION_ID, times)
-            responses.append(stub_high.SessionRun(run_req))
+            print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
             #Test run with first time > machine time so no special effort should be needed
             times = [15]
             print("Asking to run the machine for {} time(s) ({}), no special effort needed".format(len(times),times))
             run_req = make_new_session_run_request(TEST_SESSION_ID, times)
-            responses.append(stub_high.SessionRun(run_req))
+            print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
+            
+            #STEP SESSION
+            print("\n\n\nSTEP SESSION TESTS\n\n\n")
+            
+            #Test step with time < machine time and time > snapshot time to force rollback
+            print("Test step with time < machine time and time > snapshot time to force rollback")
+            times = [15,30]
+            print("Asking to run the machine for {} time(s) ({}), to prepare machine for that scenario".format(len(times),times))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
+            time = 16 
+            print("Asking to step the machine on time ({})".format(time))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, time)
+            print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
+            #Test step with time < machine time and time < snapshot time to force recreating machine
+            print("Test step with time < machine time and time < snapshot time to force recreating machine")
+            times = [20,30]
+            print("Asking to run the machine for {} time(s) ({}), to prepare machine for that scenario".format(len(times),times))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
+            time = 1 
+            print("Asking to step the machine on time ({})".format(time))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, time)
+            print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
+            #Test step with time > machine time so no special effort should be needed
+            print("Test step with time > machine time so no special effort should be needed")
+            times = [20,30]
+            print("Asking to run the machine for {} time(s) ({}), to prepare machine for that scenario".format(len(times),times))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
+            time = 35 
+            print("Asking to step the machine on time ({})".format(time))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, time)
+            print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
+            #Test step with time = machine time - 1, so step doesn't even have to make a dummy run to get into machine time = time - 1
+            print("Test step with time = machine time - 1, so step doesn't even have to make a dummy run to get into machine time = time - 1")
+            times = [20,30]
+            print("Asking to run the machine for {} time(s) ({}), to prepare machine for that scenario".format(len(times),times))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
+            time = 31 
+            print("Asking to step the machine on time ({})".format(time))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, time)
+            print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
+            
             #embed()            
         except Exception as e:
             print("An exception occurred:")
             print(e)
             print(type(e))
-            
-    for response in responses:
-        print("Core manager client received: " + str(response))
     
 if __name__ == '__main__':
+    start = time.time()
+    print("Starting at {}".format(time.ctime()))
     run()
+    print("Ending at {}".format(time.ctime()))
+    delta = time.time() - start
+    print("Took {} seconds to execute".format(datetime.timedelta(seconds=delta)))
+          

@@ -101,10 +101,20 @@ def run_machine(session_id, address, t):
         LOGGER.debug("Cartesi machine ran for session_id '{}' and desired limit of {}".format(session_id, t))
         return response
     
+def step_machine(session_id, address):
+    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
+    with grpc.insecure_channel(address) as channel:
+        stub = core_pb2_grpc.MachineStub(channel)
+        response = stub.Step(cartesi_base_pb2.Void())
+        LOGGER.debug("Cartesi machine step complete for session_id '{}'".format(session_id))
+        return response    
     
 def make_session_run_result(summaries, hashes):
     return manager_high_pb2.SessionRunResult(summaries=summaries, hashes=hashes)
-    
+
+def make_session_step_result(access_log):
+    return manager_high_pb2.SessionStepResult(log=access_log)
+
 class TimeException(Exception):
     pass
 
@@ -114,14 +124,14 @@ def validate_times(values):
     #Checking if at least one value was passed
     if values:
         for value in values:
-            if (value < 0):
-                raise TimeException("Positive values expected, first offending value: {}".format(value))
+            if (value <= 0):
+                raise TimeException("Positive non-zero values expected, first offending value: {}".format(value))
             if last_value:
                 if value < last_value:
                     raise TimeException("Provide time values in crescent order, received {} after {}".format(value, last_value)) 
             last_value = value
     else:
-        raise TimeException("Provide at least one time value") 
+        raise TimeException("Provide a time value") 
           
 #Initializing log
 LOGGER = get_new_logger(__name__)

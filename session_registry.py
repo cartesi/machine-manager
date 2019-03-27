@@ -90,9 +90,41 @@ class SessionRegistryManager:
             #Returning SessionRunResult
             return utils.make_session_run_result(summaries, hashes)
         
+    def step_session(self, session_id, time):
         
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+            
+        LOGGER.debug("Acquiring lock for session {}".format(session_id))
+        with self.registry[session_id].lock:
+            
+            #First, in case the machine time is not the desired step time -1, we must put the machine in desired
+            #step time requested -1 so we can step and retrieve the access log of that specific cycle
+            prev_time = time - 1            
+            if (self.registry[session_id].time != prev_time):
+                #It is different, putting machine in prev_time
+            
+                #Checking machine time is after required time
+                if (self.registry[session_id].time > prev_time):            
+                    #it is, checking if snapshot time is before or after required time
+                    if (self.registry[session_id].snapshot_time < prev_time):                
+                        #It is, rolling back
+                        self.rollback_machine(session_id)
+                    else:
+                        #It isn't, recreating machine from scratch
+                        self.recreate_machine(session_id)
+
+                #Execute up to prev_time if prev_time > 0
+                if prev_time:
+                    self.run_and_update_registry_time(session_id, prev_time)
+                
+            #The machine is in prev_time, stepping now
+            return utils.make_session_step_result(self.step_and_update_registry_time(session_id))
+
         
-    
+               
     """
     Here starts the "internal" API, use the methods bellow taking the right precautions such as holding a lock a session
     """
@@ -259,6 +291,25 @@ class SessionRegistryManager:
         with self.global_lock:
             LOGGER.debug("Session registry global lock acquired")
             self.registry[session_id].time = t
+            
+        LOGGER.debug("Updated time of session '{}' to {}".format(session_id, self.registry[session_id].time))
+            
+        return result
+    
+    def step_and_update_registry_time(self, session_id):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+            
+        #Stepping cartesi machine
+        result = utils.step_machine(session_id, self.registry[session_id].address)
+        
+        #Updating cartesi session time
+        #Acquiring lock to write on session registry
+        with self.global_lock:
+            LOGGER.debug("Session registry global lock acquired")
+            self.registry[session_id].time += 1
             
         LOGGER.debug("Updated time of session '{}' to {}".format(session_id, self.registry[session_id].time))
             
