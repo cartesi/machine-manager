@@ -41,10 +41,7 @@ class SessionRegistryManager:
             initial_hash = self.get_machine_root_hash(session_id)
         
             #Create snapshot
-            self.snapshot_machine(session_id)
-            
-            #Wait for the server to communicate it's listening address after finishing the snapshot
-            self.wait_for_session_address_communication(session_id)
+            self.snapshot_machine(session_id)        
             
         LOGGER.debug("Released lock for session {}".format(session_id))
         
@@ -265,7 +262,7 @@ class SessionRegistryManager:
             self.registry[session_id].address = None
             self.registry[session_id].time = 0
             self.registry[session_id].snapshot_time = None
-            self.registry[session_id].address_set_event = Event()
+            self.registry[session_id].address_set_event.clear()
         LOGGER.debug("Cleaned old server session data for session '{}'".format(session_id))
         
         #Instantiate new cartesi machine server
