@@ -3,7 +3,6 @@ from __future__ import print_function
 import grpc
 import sys
 import os
-import time
 
 #So the cartesi GRPC modules are in path
 import sys
@@ -19,8 +18,6 @@ import manager_low_pb2_grpc
 import traceback
 import argparse
 from IPython import embed
-
-SLEEP_TIME = 5
 
 TEST_SESSION_ID = "test_new_session_id"
 START = "start" 
@@ -44,7 +41,7 @@ BACKING_TEST_DRIVE_FILEPATH = "/home/carlo/crashlabs/core/src/emulator/rootfs.ex
 
 TEST_DRIVES = [
     {
-        START: 1 << 63, #2**63 or ~ 9*10**18
+        START: 0, #This should make machine creation fail
         LENGTH: os.path.getsize(BACKING_TEST_DRIVE_FILEPATH),
         BACKING: BACKING_TEST_DRIVE_FILEPATH,
         SHARED: False,
@@ -62,9 +59,6 @@ def make_new_session_request():
         drives_msg.append(drive_msg)
     machine_msg = cartesi_base_pb2.MachineRequest(rom=rom_msg, ram=ram_msg, flash=drives_msg)
     return manager_high_pb2.NewSessionRequest(session_id=TEST_SESSION_ID, machine=machine_msg)
-
-def make_new_session_run_request(session_id, times):
-    return manager_high_pb2.SessionRunRequest(session_id=session_id, times=times)
 
 def address(add):
     #TODO: validate address
@@ -97,7 +91,7 @@ def get_args():
     return (srv_add, srv_port) 
 
 def run():
-    responses = []
+    response, response2, response3, response4 = (None, None, None, None)
     srv_add, srv_port = get_args()
     conn_str = srv_add + ':' + srv_port
     print("Connecting to server in " + conn_str)
@@ -105,37 +99,26 @@ def run():
         stub_low = manager_low_pb2_grpc.MachineManagerLowStub(channel)
         stub_high = manager_high_pb2_grpc.MachineManagerHighStub(channel)
         try:           
-            #Test new session
-            print("Asking to create a new session")
-            responses.append(stub_high.NewSession(make_new_session_request()))
-            #Test run from pristine machine
-            times = [1, 15, 30, 45, 60]
-            print("Asking to run the machine for {} time(s) ({})".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
-            responses.append(stub_high.SessionRun(run_req))
-            #Test run with first time < machine time and first time > snapshot time to force rollback
-            times = [30, 35, 40, 45]
-            print("Asking to run the machine for {} time(s) ({}), the 1st time forces a rollback".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
-            responses.append(stub_high.SessionRun(run_req))
-            #Test run with first time < machine time and first time < snapshot time to force recreating machine
-            times = [1, 5, 10]
-            print("Asking to run the machine for {} time(s) ({}), the 1st time forces a recreating the machine".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
-            responses.append(stub_high.SessionRun(run_req))
-            #Test run with first time > machine time so no special effort should be needed
-            times = [15]
-            print("Asking to run the machine for {} time(s) ({}), no special effort needed".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
-            responses.append(stub_high.SessionRun(run_req))
+            #Test new session with problem on drive start address
+            response = stub_high.NewSession(make_new_session_request())
             #embed()            
         except Exception as e:
             print("An exception occurred:")
             print(e)
             print(type(e))
+        try:
+            #Test communicate Address for a session that doesn't exist
+            add_req_msg = manager_low_pb2.AddressRequest(session_id="test_session_id", address="localhost:50000")
+            response2 = stub_low.CommunicateAddress(add_req_msg)
+        except Exception as e:
+            print("An exception occurred:")
+            print(e)
+            print(type(e))           
             
-    for response in responses:
+    if (response):
         print("Core manager client received: " + str(response))
+    if (response2):
+        print("Core manager client received: " + str(response2))
     
 if __name__ == '__main__':
     run()

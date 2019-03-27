@@ -15,7 +15,7 @@ import manager_high_pb2_grpc
 import manager_high_pb2
 import cartesi_base_pb2
 import utils
-from session_registry import SessionRegistryManager, SessionIdException, AddressException
+from session_registry import SessionRegistryManager, SessionIdException, AddressException, RollbackException
 
 LOGGER = utils.get_new_logger(__name__)
 LOGGER = utils.configure_log(LOGGER)
@@ -32,28 +32,10 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
         try:            
             session_id = request.session_id
             machine_req = request.machine
-            LOGGER.debug("New session requested with session_id: {}".format(session_id))
+            LOGGER.info("New session requested with session_id: {}".format(session_id))
 
-            #Registering new session
-            self.session_registry_manager.register_session(session_id)
-            
-            #Instantiate new cartesi machine server
-            self.session_registry_manager.create_new_cartesi_machine_server(session_id)
-
-            #Wait for the new server to communicate it's listening address
-            self.session_registry_manager.wait_for_session_address_communication(session_id)
-
-            #Communication received, create new cartesi machine
-            self.session_registry_manager.create_machine(session_id, machine_req)
-
-            #calculate cartesi machine initial hash
-            initial_hash = self.session_registry_manager.get_machine_root_hash(session_id)
-            
-            #Create snapshot
-            self.session_registry_manager.snapshot_machine(session_id)
-
-            #Return the initial hash
-            return initial_hash
+            #Create the session and return the initial hash
+            return self.session_registry_manager.new_session(session_id, machine_req)
     
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
@@ -67,7 +49,27 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             context.set_code(grpc.StatusCode.UNKNOWN)   
 
     def SessionRun(self, request, context):
-        return manager_high_pb2.SessinoRunResult()
+        try:            
+            session_id = request.session_id
+            times = request.times
+            LOGGER.info("New session run requested for session_id {} with times {}".format(session_id, times))
+            
+            #Validate time values are valid
+            utils.validate_times(times)
+
+            #Execute and return the session run result
+            return self.session_registry_manager.run_session(session_id, times)
+    
+        #No session with provided id or address issue
+        except (SessionIdException, AddressException, utils.TimeException, RollbackException) as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Generic error catch
+        except Exception as e:
+            LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))            
+            context.set_details('An exception with message "{}" was raised!'.format(e))
+            context.set_code(grpc.StatusCode.UNKNOWN)         
 
     def SessionStep(self, request, context):
         return manager_high_pb2.SessionStepResult()
