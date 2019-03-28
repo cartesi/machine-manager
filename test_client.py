@@ -19,7 +19,7 @@ import manager_low_pb2
 import manager_low_pb2_grpc
 import traceback
 import argparse
-from IPython import embed
+#from IPython import embed
 
 SLEEP_TIME = 5
 
@@ -143,6 +143,16 @@ def run():
             #STEP SESSION
             print("\n\n\nSTEP SESSION TESTS\n\n\n")
             
+            #Test step with initial cycle = 0, so step should happen on a new machine
+            print("Test step with initial cycle = 0, so step should happen on a new machine")
+            #final_cycles = [20,30]
+            #print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
+            #run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
+            #print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
+            initial_cycle = 0
+            print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
+            print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
             #Test step with initial cycle < machine cycle and initial cycle > snapshot cycle to force rollback
             print("Test step with initial cycle < machine cycle and initial cycle > snapshot cycle to force rollback")
             final_cycles = [15,30]
