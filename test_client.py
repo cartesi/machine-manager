@@ -64,11 +64,11 @@ def make_new_session_request():
     machine_msg = cartesi_base_pb2.MachineRequest(rom=rom_msg, ram=ram_msg, flash=drives_msg)
     return manager_high_pb2.NewSessionRequest(session_id=TEST_SESSION_ID, machine=machine_msg)
 
-def make_new_session_run_request(session_id, times):
-    return manager_high_pb2.SessionRunRequest(session_id=session_id, times=times)
+def make_new_session_run_request(session_id, final_cycles):
+    return manager_high_pb2.SessionRunRequest(session_id=session_id, final_cycles=final_cycles)
 
-def make_new_session_step_request(session_id, time):
-    return manager_high_pb2.SessionStepRequest(session_id=session_id, time=time)
+def make_new_session_step_request(session_id, initial_cycle):
+    return manager_high_pb2.SessionStepRequest(session_id=session_id, initial_cycle=initial_cycle)
 
 def address(add):
     #TODO: validate address
@@ -120,68 +120,68 @@ def run():
             print("\n\n\nRUN SESSION TESTS\n\n\n")
             
             #Test run from pristine machine
-            times = [1, 15, 30, 45, 60]
-            print("Asking to run the machine for {} time(s) ({})".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            final_cycles = [1, 15, 30, 45, 60]
+            print("Asking to run the machine for {} final cycle(s) ({})".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
-            #Test run with first time < machine time and first time > snapshot time to force rollback
-            times = [30, 35, 40, 45]
-            print("Asking to run the machine for {} time(s) ({}), the 1st time forces a rollback".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            #Test run with first final_cycle < machine cycle and first final_cycle > snapshot cycle to force rollback
+            final_cycles = [30, 35, 40, 45]
+            print("Asking to run the machine for {} final cycles(s) ({}), the 1st final cycle forces a rollback".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
-            #Test run with first time < machine time and first time < snapshot time to force recreating machine
-            times = [1, 5, 10]
-            print("Asking to run the machine for {} time(s) ({}), the 1st time forces a recreating the machine".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            #Test run with first final cycle < machine cycle and first final cycle < snapshot cycle to force recreating machine
+            final_cycles = [1, 5, 10]
+            print("Asking to run the machine for {} final cycle(s) ({}), the 1st final cycle forces recreating the machine".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
-            #Test run with first time > machine time so no special effort should be needed
-            times = [15]
-            print("Asking to run the machine for {} time(s) ({}), no special effort needed".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            #Test run with first final cycle > machine cycle so no special effort should be needed
+            final_cycles = [15]
+            print("Asking to run the machine for {} final cycle(s) ({}), no special effort needed".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
             
             #STEP SESSION
             print("\n\n\nSTEP SESSION TESTS\n\n\n")
             
-            #Test step with time < machine time and time > snapshot time to force rollback
-            print("Test step with time < machine time and time > snapshot time to force rollback")
-            times = [15,30]
-            print("Asking to run the machine for {} time(s) ({}), to prepare machine for that scenario".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            #Test step with initial cycle < machine cycle and initial cycle > snapshot cycle to force rollback
+            print("Test step with initial cycle < machine cycle and initial cycle > snapshot cycle to force rollback")
+            final_cycles = [15,30]
+            print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
-            time = 16 
-            print("Asking to step the machine on time ({})".format(time))
-            step_req = make_new_session_step_request(TEST_SESSION_ID, time)
+            initial_cycle = 16 
+            print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
-            #Test step with time < machine time and time < snapshot time to force recreating machine
-            print("Test step with time < machine time and time < snapshot time to force recreating machine")
-            times = [20,30]
-            print("Asking to run the machine for {} time(s) ({}), to prepare machine for that scenario".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            #Test step with initial cycle < machine cycle and initial cycle < snapshot cycle to force recreating machine
+            print("Test step with initial cycle < machine cycle and initial cycle < snapshot cycle to force recreating machine")
+            final_cycles = [20,30]
+            print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
-            time = 1 
-            print("Asking to step the machine on time ({})".format(time))
-            step_req = make_new_session_step_request(TEST_SESSION_ID, time)
+            initial_cycle = 1 
+            print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
-            #Test step with time > machine time so no special effort should be needed
-            print("Test step with time > machine time so no special effort should be needed")
-            times = [20,30]
-            print("Asking to run the machine for {} time(s) ({}), to prepare machine for that scenario".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            #Test step with initial cycle > machine cycle so no special effort should be needed
+            print("Test step with initial cycle > machine cycle so no special effort should be needed")
+            final_cycles = [20,30]
+            print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
-            time = 35 
-            print("Asking to step the machine on time ({})".format(time))
-            step_req = make_new_session_step_request(TEST_SESSION_ID, time)
+            initial_cycle = 35 
+            print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
-            #Test step with time = machine time - 1, so step doesn't even have to make a dummy run to get into machine time = time - 1
-            print("Test step with time = machine time - 1, so step doesn't even have to make a dummy run to get into machine time = time - 1")
-            times = [20,30]
-            print("Asking to run the machine for {} time(s) ({}), to prepare machine for that scenario".format(len(times),times))
-            run_req = make_new_session_run_request(TEST_SESSION_ID, times)
+            #Test step with initial cycle = machine cycle, so step doesn't even have to make a dummy run to get into machine cycle = initial cycle
+            print("Test step with initial cycle = machine cycle, so step doesn't even have to make a dummy run to get into machine cycle = initial cycle")
+            final_cycles = [20,30]
+            print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
-            time = 31 
-            print("Asking to step the machine on time ({})".format(time))
-            step_req = make_new_session_step_request(TEST_SESSION_ID, time)
+            initial_cycle = 30 
+            print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
+            step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(stub_high.SessionStep(step_req)))
             
             #embed()            

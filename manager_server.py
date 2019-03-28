@@ -51,17 +51,17 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
     def SessionRun(self, request, context):
         try:            
             session_id = request.session_id
-            times = request.times
-            LOGGER.info("New session run requested for session_id {} with times {}".format(session_id, times))
+            final_cycles = request.final_cycles
+            LOGGER.info("New session run requested for session_id {} with final cycles {}".format(session_id, final_cycles))
             
-            #Validate time values
-            utils.validate_times(times)
+            #Validate cycle values
+            utils.validate_cycles(final_cycles)
 
             #Execute and return the session run result
-            return self.session_registry_manager.run_session(session_id, times)
+            return self.session_registry_manager.run_session(session_id, final_cycles)
     
-        #No session with provided id, address issue, bad times provided or problem during rollback
-        except (SessionIdException, AddressException, utils.TimeException, RollbackException) as e:
+        #No session with provided id, address issue, bad final cycles provided or problem during rollback
+        except (SessionIdException, AddressException, utils.CycleException, RollbackException) as e:
             LOGGER.error(e)
             context.set_details("{}".format(e))
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -74,17 +74,17 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
     def SessionStep(self, request, context):
         try:            
             session_id = request.session_id
-            time = request.time
-            LOGGER.info("New session step requested for session_id {} with time {}".format(session_id, time))
+            initial_cycle = request.initial_cycle
+            LOGGER.info("New session step requested for session_id {} with initial cycle {}".format(session_id, initial_cycle))
             
-            #Validate time value
-            utils.validate_times([time])
+            #Validate cycle value
+            utils.validate_cycles([initial_cycle])
 
             #Execute and return the session step result
-            return self.session_registry_manager.step_session(session_id, time)
+            return self.session_registry_manager.step_session(session_id, initial_cycle)
     
-        #No session with provided id, address issue, bad time provided or problem during rollback
-        except (SessionIdException, AddressException, utils.TimeException, RollbackException) as e:
+        #No session with provided id, address issue, bad initial cycle provided or problem during rollback
+        except (SessionIdException, AddressException, utils.CycleException, RollbackException) as e:
             LOGGER.error(e)
             context.set_details("{}".format(e))
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)

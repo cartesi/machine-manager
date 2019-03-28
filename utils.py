@@ -75,6 +75,7 @@ def get_machine_hash(session_id, address):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
         stub = core_pb2_grpc.MachineStub(channel)
+        LOGGER.debug("Asking for cartesi machine root hash for session_id '{}'".format(session_id))
         response = stub.GetRootHash(cartesi_base_pb2.Void())
         LOGGER.debug("Cartesi machine root hash retrieved for session_id '{}'".format(session_id))
         return response
@@ -93,12 +94,12 @@ def rollback_machine(session_id, address):
         stub.Rollback(cartesi_base_pb2.Void())
         LOGGER.debug("Cartesi machine rolledback for session_id '{}'".format(session_id))
     
-def run_machine(session_id, address, t):
+def run_machine(session_id, address, c):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
         stub = core_pb2_grpc.MachineStub(channel)
-        response = stub.Run(cartesi_base_pb2.RunRequest(limit=t))
-        LOGGER.debug("Cartesi machine ran for session_id '{}' and desired limit of {}".format(session_id, t))
+        response = stub.Run(cartesi_base_pb2.RunRequest(limit=c))
+        LOGGER.debug("Cartesi machine ran for session_id '{}' and desired final cycle of {}".format(session_id, c))
         return response
     
 def step_machine(session_id, address):
@@ -115,23 +116,23 @@ def make_session_run_result(summaries, hashes):
 def make_session_step_result(access_log):
     return manager_high_pb2.SessionStepResult(log=access_log)
 
-class TimeException(Exception):
+class CycleException(Exception):
     pass
 
-def validate_times(values):
+def validate_cycles(values):
     last_value = None
     
     #Checking if at least one value was passed
     if values:
         for value in values:
-            if (value <= 0):
-                raise TimeException("Positive non-zero values expected, first offending value: {}".format(value))
+            if (value < 0):
+                raise CycleException("Positive values expected, first offending value: {}".format(value))
             if last_value:
                 if value < last_value:
-                    raise TimeException("Provide time values in crescent order, received {} after {}".format(value, last_value)) 
+                    raise CycleException("Provide cycle values in crescent order, received {} after {}".format(value, last_value)) 
             last_value = value
     else:
-        raise TimeException("Provide a time value") 
+        raise CycleException("Provide a cycle value") 
           
 #Initializing log
 LOGGER = get_new_logger(__name__)
