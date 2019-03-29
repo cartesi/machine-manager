@@ -119,6 +119,9 @@ def make_session_step_result(access_log):
 class CycleException(Exception):
     pass
 
+class CartesiMachineServerException(Excepction):
+    pass
+
 def validate_cycles(values):
     last_value = None
     
