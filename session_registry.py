@@ -29,10 +29,7 @@ class SessionRegistryManager:
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
             #Instantiate new cartesi machine server
-            self.create_new_cartesi_machine_server(session_id)
-        
-            #Wait for the new server to communicate it's listening address
-            self.wait_for_session_address_communication(session_id)
+            self.create_new_cartesi_machine_server(session_id)                    
         
             #Communication received, create new cartesi machine
             self.create_machine(session_id, machine_req)
@@ -150,9 +147,13 @@ class SessionRegistryManager:
         LOGGER.debug("Waiting for session address communication for session_id '{}'".format(session_id))
         self.registry[session_id].address_set_event.wait()
         LOGGER.debug("Address for session_id '{}' communicated: {}".format(session_id, self.registry[session_id].address))
-        #LOGGER.debug("Sleeping a bit")
-        #time.sleep(WAIT_SERVER_TIME)
-        #LOGGER.debug("Sleep is over")
+        LOGGER.debug("Acquiring session registry global lock")
+        #Acquiring lock to write on session registry
+        with self.global_lock:
+            LOGGER.debug("Session registry global lock acquired")
+            LOGGER.debug("Cleaning address set event")
+            self.registry[session_id].address_set_event.clear()
+            LOGGER.debug("Address set event cleaned")
         
     def register_address_for_session(self, session_id, address):
         
@@ -177,6 +178,9 @@ class SessionRegistryManager:
         LOGGER.debug("Creating new cartesi machine server for session_id '{}'".format(session_id))
         utils.new_cartesi_machine_server(session_id)
         LOGGER.debug("Server created for session '{}'".format(session_id))
+        
+        #Wait for the new server to communicate it's listening address
+        self.wait_for_session_address_communication(session_id)
     
     def create_machine(self, session_id, machine_req):
         if (session_id not in self.registry.keys()):
@@ -219,9 +223,9 @@ class SessionRegistryManager:
             LOGGER.debug("Session registry global lock acquired")
             self.registry[session_id].snapshot_cycle = self.registry[session_id].cycle
             LOGGER.debug("Updated snapshot cycle of session '{}' to {}".format(session_id, self.registry[session_id].cycle))
-        LOGGER.debug("Sleeping a bit")
-        time.sleep(WAIT_SERVER_TIME)
-        LOGGER.debug("Sleep is over")
+        
+        #Wait for the new server to communicate it's listening address
+        self.wait_for_session_address_communication(session_id)
             
     def rollback_machine(self, session_id):
         if (session_id not in self.registry.keys()):
@@ -241,9 +245,9 @@ class SessionRegistryManager:
             self.registry[session_id].cycle = self.registry[session_id].snapshot_cycle
             self.registry[session_id].snapshot_cycle = None
             LOGGER.debug("Updated cycle of session '{}' to {} and cleared snapshot cycle".format(session_id, self.registry[session_id].cycle))
-        LOGGER.debug("Sleeping a bit")
-        time.sleep(WAIT_SERVER_TIME)
-        LOGGER.debug("Sleep is over")
+        
+        #Wait for the new server to communicate it's listening address
+        self.wait_for_session_address_communication(session_id)
             
     def recreate_machine(self, session_id):
         if (session_id not in self.registry.keys()):
@@ -261,14 +265,11 @@ class SessionRegistryManager:
             self.registry[session_id].address = None
             self.registry[session_id].cycle = 0
             self.registry[session_id].snapshot_cycle = None
-            self.registry[session_id].address_set_event.clear()
+            
         LOGGER.debug("Cleaned old server session data for session '{}'".format(session_id))
         
         #Instantiate new cartesi machine server
         self.create_new_cartesi_machine_server(session_id)
-        
-        #Wait for the new server to communicate it's listening address
-        self.wait_for_session_address_communication(session_id)
         
         #Communication received, create new cartesi machine using saved parameters
         self.create_machine(session_id, self.registry[session_id].creation_machine_req)        
