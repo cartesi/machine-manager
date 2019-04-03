@@ -21,6 +21,7 @@ class SessionRegistryManager:
     def __init__(self):
         self.global_lock = Lock()
         self.registry = {}
+        self.shutting_down = False
         
     def new_session(self, session_id, machine_req):
         #Registering new session
