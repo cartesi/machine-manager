@@ -22,6 +22,8 @@ import argparse
 #from IPython import embed
 
 SLEEP_TIME = 5
+DEFAULT_PORT = 50051
+DEFAULT_ADD = 'localhost'
 
 TEST_SESSION_ID = "test_new_session_id"
 START = "start" 
@@ -31,22 +33,26 @@ SHARED = "shared"
 LABEL = "label"
 BOOTARGS = "bootargs"
 
+CONTAINER_SERVER = False
+
 TEST_ROM = {
     BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw -- /bin/echo nice"
 }
 
 TEST_RAM = {
     LENGTH: 64 << 20, #2**26 or 67108864
-    BACKING: "/home/carlo/crashlabs/core/src/emulator/kernel.bin"
-    
+    BACKING: "kernel.bin"
 }
 
-BACKING_TEST_DRIVE_FILEPATH = "/home/carlo/crashlabs/core/src/emulator/rootfs.ext2"
+CONTAINER_BASE_PATH = "/root/host/"
+NATIVE_BASE_PATH = "{}/test-files/".format(os.path.dirname(os.path.realpath(__file__)))
+
+BACKING_TEST_DRIVE_FILEPATH = "rootfs.ext2"
 
 TEST_DRIVES = [
     {
         START: 1 << 63, #2**63 or ~ 9*10**18
-        LENGTH: os.path.getsize(BACKING_TEST_DRIVE_FILEPATH),
+        LENGTH: 46223360,
         BACKING: BACKING_TEST_DRIVE_FILEPATH,
         SHARED: False,
         LABEL: "root filesystem"
@@ -54,11 +60,15 @@ TEST_DRIVES = [
 ]
 
 def make_new_session_request():
+    files_dir = NATIVE_BASE_PATH
+    if (CONTAINER_SERVER):
+        files_dir = CONTAINER_BASE_PATH
+        
     rom_msg = cartesi_base_pb2.ROM(bootargs=TEST_ROM[BOOTARGS])
-    ram_msg = cartesi_base_pb2.RAM(length=TEST_RAM[LENGTH], backing=TEST_RAM[BACKING])
+    ram_msg = cartesi_base_pb2.RAM(length=TEST_RAM[LENGTH], backing=files_dir + TEST_RAM[BACKING])
     drives_msg = []
     for drive in TEST_DRIVES:
-        drive_msg = cartesi_base_pb2.Drive(start=drive[START], length=drive[LENGTH], backing=drive[BACKING], 
+        drive_msg = cartesi_base_pb2.Drive(start=drive[START], length=drive[LENGTH], backing=files_dir + drive[BACKING], 
                                            shared=drive[SHARED], label=drive[LABEL])
         drives_msg.append(drive_msg)
     machine_msg = cartesi_base_pb2.MachineRequest(rom=rom_msg, ram=ram_msg, flash=drives_msg)
@@ -85,25 +95,20 @@ def port_number(port):
    
 def get_args():
     parser = argparse.ArgumentParser(description='GRPC client to the high level emulator API (core manager)')
-    parser.add_argument('server_add', type=address, help="Core manager GRPC server address")
-    parser.add_argument('server_port', type=port_number, help="Core manager GRPC server port")
+    parser.add_argument('--address', '-a', type=address, dest='address', default=DEFAULT_ADD, help="Core manager GRPC server address")
+    parser.add_argument('--port', '-p', type=port_number, dest='port', default=DEFAULT_PORT, help="Core manager GRPC server port")
+    parser.add_argument('--container', '-c', action="store_true", dest="container_server", help="Core manager GPRC server is running from docker container")
     args = parser.parse_args()
-
-    srv_add = "localhost"
-    srv_port = "50051"
     
-    if args.server_add:
-        srv_add = args.server_add
-
-    if args.server_port:
-        srv_port = args.server_port
-
-    return (srv_add, srv_port) 
+    global CONTAINER_SERVER
+    CONTAINER_SERVER = args.container_server
+    
+    return (args.address, args.port) 
 
 def run():
     responses = []
     srv_add, srv_port = get_args()
-    conn_str = srv_add + ':' + srv_port
+    conn_str = "{}:{}".format(srv_add, srv_port)
     print("Connecting to server in " + conn_str)
     with grpc.insecure_channel(conn_str) as channel:
         stub_low = manager_low_pb2_grpc.MachineManagerLowStub(channel)
