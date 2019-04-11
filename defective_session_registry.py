@@ -1,6 +1,5 @@
 import session_registry
 import utils
-from IPython import embed
 
 LOGGER = utils.get_new_logger("!!!!!DEFECTIVE!!!!!_" + __name__ + "_!!!!!DEFECTIVE!!!!!")
 LOGGER = utils.configure_log(LOGGER)
