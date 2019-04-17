@@ -151,14 +151,15 @@ def serve(args):
     else:
         from session_registry import SessionRegistryManager
         
-    session_registry_manager = SessionRegistryManager()
+    manager_address = '{}:{}'.format(listening_add, listening_port)
+    session_registry_manager = SessionRegistryManager(manager_address)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     manager_high_pb2_grpc.add_MachineManagerHighServicer_to_server(_MachineManagerHigh(session_registry_manager),
                                                       server)
     manager_low_pb2_grpc.add_MachineManagerLowServicer_to_server(_MachineManagerLow(session_registry_manager),
                                                       server)
 
-    server.add_insecure_port('{}:{}'.format(listening_add, listening_port))
+    server.add_insecure_port(manager_address)
     server.start()
     LOGGER.info("Server started, listening on address {} and port {}".format(listening_add, listening_port))
     try:

@@ -39,11 +39,11 @@ def configure_log(logger):
     
     return logger
 
-def new_cartesi_machine_server(session_id):
+def new_cartesi_machine_server(session_id, manager_address):
     
     LOGGER.info("Creating a cartesi machine server with session_id '{}'".format(session_id))
     
-    cmd_line = ["core/src/emulator/server",SOCKET_TYPE, session_id]
+    cmd_line = ["core/src/emulator/server", "-t", SOCKET_TYPE, "-s", session_id, "-m", manager_address]
     LOGGER.debug("Executing {}".format(" ".join(cmd_line)))
     proc = subprocess.Popen(cmd_line, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     out, err = proc.communicate()

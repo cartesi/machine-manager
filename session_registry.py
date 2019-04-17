@@ -18,10 +18,11 @@ class RollbackException(Exception):
 
 class SessionRegistryManager:
     
-    def __init__(self):
+    def __init__(self, manager_address):
         self.global_lock = Lock()
         self.registry = {}
         self.shutting_down = False
+        self.manager_address = manager_address;
         
     def new_session(self, session_id, machine_req):
         #Registering new session
@@ -177,7 +178,7 @@ class SessionRegistryManager:
             raise AddressException("Address already set for server with session_id '{}'".format(session_id))
             
         LOGGER.debug("Creating new cartesi machine server for session_id '{}'".format(session_id))
-        utils.new_cartesi_machine_server(session_id)
+        utils.new_cartesi_machine_server(session_id, self.manager_address)
         LOGGER.debug("Server created for session '{}'".format(session_id))
         
         #Wait for the new server to communicate it's listening address
@@ -233,7 +234,7 @@ class SessionRegistryManager:
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
             raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
-        if (not self.registry[session_id].snapshot_cycle):
+        if (self.registry[session_id].snapshot_cycle == None):
             raise RollbackException("There is no snapshot to rollback to for the cartesi machine with session_id '{}'".format(session_id))
             
         LOGGER.debug("Issuing server to rollback machine for session '{}'".format(session_id))

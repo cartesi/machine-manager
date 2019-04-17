@@ -125,7 +125,7 @@ def run():
             print("\n\n\nRUN SESSION TESTS\n\n\n")
             
             #Test run from pristine machine
-            final_cycles = [1, 15, 30, 45, 60]
+            final_cycles = [0, 15, 30, 45, 60]
             print("Asking to run the machine for {} final cycle(s) ({})".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(stub_high.SessionRun(run_req)))
