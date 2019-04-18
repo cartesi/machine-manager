@@ -3,7 +3,7 @@ import utils
 
 LOGGER = utils.get_new_logger("!!!!!DEFECTIVE!!!!!_" + __name__ + "_!!!!!DEFECTIVE!!!!!")
 LOGGER = utils.configure_log(LOGGER)
-MAX_CYCLE = 15
+MAX_CYCLE = 7
 
 class SessionRegistryManager(session_registry.SessionRegistryManager):   
     
