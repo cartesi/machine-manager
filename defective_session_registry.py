@@ -18,7 +18,7 @@ class SessionRegistryManager(session_registry.SessionRegistryManager):
             else:
                 modified_cycles.append(int(cycle))
                 
-        LOGGER.debug("Executing defective run for session '{}'\nDesired cycles: {}\nUSed cycles: {}".format(session_id, final_cycles, modified_cycles))
+        LOGGER.debug("Executing defective run for session '{}'\nDesired cycles: {}\nUsed cycles: {}".format(session_id, final_cycles, modified_cycles))
         
         #Executing run over the desired modified cycles
         session_run_result = super().run_session(session_id, modified_cycles)
@@ -27,7 +27,7 @@ class SessionRegistryManager(session_registry.SessionRegistryManager):
         for i,summary in enumerate(session_run_result.summaries): 
             summary.mcycle=int(final_cycles[i]) 
             
-        LOGGER.debug("Finished executing defective run for session '{}'\nDesired cycles: {}\nUSed cycles: {}".format(session_id, final_cycles, modified_cycles))
+        LOGGER.debug("Finished executing defective run for session '{}'\nDesired cycles: {}\nUsed cycles: {}".format(session_id, final_cycles, modified_cycles))
 
         return session_run_result
         

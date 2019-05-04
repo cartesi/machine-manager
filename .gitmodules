@@ -1,9 +1,6 @@
 [submodule "core"]
 	path = core
 	url = git@github.com:cartesi/machine-emulator.git
-[submodule "cartesi-grpc"]
-	path = cartesi-grpc
-	url = git@github.com:cartesi/cartesi-grpc.git
 [submodule "image-ci"]
 	path = image-ci
 	url = git@github.com:cartesi/image-ci.git

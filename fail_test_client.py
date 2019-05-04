@@ -6,7 +6,7 @@ import os
 
 #So the cartesi GRPC modules are in path
 import sys
-sys.path.insert(0,'cartesi-grpc/py')
+sys.path.insert(0,'core/cartesi-grpc/py')
 
 import core_pb2
 import cartesi_base_pb2

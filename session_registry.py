@@ -50,6 +50,7 @@ class SessionRegistryManager:
         
         summaries = []
         hashes = []
+        desired_cycles = final_cycles
         
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
@@ -59,7 +60,7 @@ class SessionRegistryManager:
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
             
-            first_c = final_cycles.pop(0)
+            first_c = desired_cycles.pop(0)
             
             #Checking machine cycle is after first required cycle
             if (self.registry[session_id].cycle > first_c):            
@@ -79,7 +80,7 @@ class SessionRegistryManager:
             hashes.append(self.get_machine_root_hash(session_id))
             
             #Executing additional runs on given final_cycles
-            for c in final_cycles:
+            for c in desired_cycles:
                 summaries.append(self.run_and_update_registry_cycle(session_id, c))
                 hashes.append(self.get_machine_root_hash(session_id))
                 
