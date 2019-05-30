@@ -50,7 +50,7 @@ class SessionRegistryManager:
         
         summaries = []
         hashes = []
-        desired_cycles = final_cycles
+        desired_cycles = [c for c in final_cycles]
         
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
@@ -59,19 +59,24 @@ class SessionRegistryManager:
             
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
-            
+
             first_c = desired_cycles.pop(0)
-            
+
             #Checking machine cycle is after first required cycle
-            if (self.registry[session_id].cycle > first_c):            
-                #it is, checking if snapshot cycle is before or after required cycle
-                if (self.registry[session_id].snapshot_cycle < first_c):                
-                    #It is, rolling back
-                    self.rollback_machine(session_id)
+            if (self.registry[session_id].cycle > first_c):
+                #It is, checking if there is a snapshot image
+                if (self.registry[session_id].snapshot_cycle != None):
+                    #There is, checking if snapshot cycle is before or after required cycle
+                    if (self.registry[session_id].snapshot_cycle <= first_c):
+                        #It is, rolling back
+                        self.rollback_machine(session_id)
+                    else:
+                        #It isn't, recreating machine from scratch
+                        self.recreate_machine(session_id)
                 else:
-                    #It isn't, recreating machine from scratch
+                    #There isn't, recreating machine from scratch
                     self.recreate_machine(session_id)
-                    
+
             #Make execute and make machine snapshot
             summaries.append(self.run_and_update_registry_cycle(session_id, first_c))
             self.snapshot_machine(session_id)
@@ -83,43 +88,63 @@ class SessionRegistryManager:
             for c in desired_cycles:
                 summaries.append(self.run_and_update_registry_cycle(session_id, c))
                 hashes.append(self.get_machine_root_hash(session_id))
-                
-            #Returning SessionRunResult
-            return utils.make_session_run_result(summaries, hashes)
-        
+
+        run_result = utils.make_session_run_result(summaries, hashes)
+
+        #Checking if log level is DEBUG or more detailed since building the
+        #debug info is expensive
+        if LOGGER.getEffectiveLevel() <= utils.logging.DEBUG:
+            LOGGER.debug(utils.dump_run_response_to_json(run_result))
+
+        #Returning SessionRunResult
+        return run_result
+
     def step_session(self, session_id, initial_cycle):
-        
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
             raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
-            
+
+        step_result = None
+
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
-            
+
             #First, in case the machine cycle is not the desired step initial cycle, we must put the machine in desired
-            #step initial cycle so we can then step and retrieve the access log of that specific cycle          
+            #step initial cycle so we can then step and retrieve the access log of that specific cycle
             if (self.registry[session_id].cycle != initial_cycle):
                 #It is different, putting machine in initial_cycle
-            
+
                 #Checking machine cycle is after required cycle
-                if (self.registry[session_id].cycle > initial_cycle):            
-                    #it is, checking if snapshot cycle is before or after required cycle
-                    if (self.registry[session_id].snapshot_cycle < initial_cycle):                
-                        #It is, rolling back
-                        self.rollback_machine(session_id)
+                if (self.registry[session_id].cycle > initial_cycle):
+                    #It is, checking if there is a snapshot image
+                    if (self.registry[session_id].snapshot_cycle != None):
+                        #There is, checking if snapshot cycle is before or after required cycle
+                        if (self.registry[session_id].snapshot_cycle <= initial_cycle):
+                            #It is, rolling back
+                            self.rollback_machine(session_id)
+                        else:
+                            #It isn't, recreating machine from scratch
+                            self.recreate_machine(session_id)
                     else:
-                        #It isn't, recreating machine from scratch
+                        #There isn't, recreating machine from scratch
                         self.recreate_machine(session_id)
 
                 #Execute up to initial_cycle if initial_cycle > 0
                 if (initial_cycle > 0):
                     self.run_and_update_registry_cycle(session_id, initial_cycle)
-                
-            #The machine is in initial_cycle, stepping now
-            return utils.make_session_step_result(self.step_and_update_registry_cycle(session_id))
 
-        
+            #The machine is in initial_cycle, stepping now
+            step_result =  utils.make_session_step_result(self.step_and_update_registry_cycle(session_id))
+
+        #Checking if log level is DEBUG or more detailed since building the
+        #debug info is expensive
+        if LOGGER.getEffectiveLevel() <= utils.logging.DEBUG:
+            LOGGER.debug(utils.dump_step_response_to_json(step_result))
+
+        #Returning SessionStepResult
+        return step_result
+
                
     """
     Here starts the "internal" API, use the methods bellow taking the right precautions such as holding a lock a session
@@ -208,7 +233,7 @@ class SessionRegistryManager:
             
         LOGGER.debug("Issuing server to get machine root hash for session '{}'".format(session_id))
         root_hash = utils.get_machine_hash(session_id, self.registry[session_id].address)
-        LOGGER.debug("Executed getting machine root hash for session '{}'".format(session_id))
+        LOGGER.debug("Executed getting machine root hash for session '{}': 0x{}".format(session_id, root_hash.content.hex()))
         return root_hash
         
     def snapshot_machine(self, session_id):

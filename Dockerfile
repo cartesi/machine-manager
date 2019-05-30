@@ -7,7 +7,7 @@ ENV EMU_BASE=$BASE/core/src/emulator
 
 RUN mkdir $BASE
 
-COPY . $BASE
+COPY requirements.txt $BASE/
 
 # Install python and other dependencies
 RUN \
@@ -16,6 +16,8 @@ RUN \
 
 RUN \
     pip3 install -r $BASE/requirements.txt
+
+COPY . $BASE
 
 #Building the emulator
 RUN \

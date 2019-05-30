@@ -7,6 +7,7 @@ import cartesi_base_pb2
 import manager_high_pb2
 import traceback
 import grpc
+import json
 
 LOG_FILENAME = "manager.log"
 UNIX = "unix"
@@ -101,15 +102,15 @@ def run_machine(session_id, address, c):
         response = stub.Run(cartesi_base_pb2.RunRequest(limit=c))
         LOGGER.debug("Cartesi machine ran for session_id '{}' and desired final cycle of {}".format(session_id, c))
         return response
-    
+
 def step_machine(session_id, address):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
         stub = core_pb2_grpc.MachineStub(channel)
         response = stub.Step(cartesi_base_pb2.Void())
         LOGGER.debug("Cartesi machine step complete for session_id '{}'".format(session_id))
-        return response    
-    
+        return response
+
 def make_session_run_result(summaries, hashes):
     return manager_high_pb2.SessionRunResult(summaries=summaries, hashes=hashes)
 
@@ -124,7 +125,7 @@ class CartesiMachineServerException(Exception):
 
 def validate_cycles(values):
     last_value = None
-    
+
     #Checking if at least one value was passed
     if values:
         for value in values:
@@ -136,7 +137,66 @@ def validate_cycles(values):
             last_value = value
     else:
         raise CycleException("Provide a cycle value") 
-          
+
+#Debugging functions
+
+def dump_step_response_to_json(access_log):
+    access_log_dict = {'accesses':[], 'notes':[], 'brackets':[]}
+
+    for note in access_log.log.notes:
+        access_log_dict['notes'].append(note)
+
+    for bracket in access_log.log.brackets:
+        access_log_dict['brackets'].append(
+                {
+                    'type':
+                    cartesi_base_pb2._BRACKETNOTE_BRACKETNOTETYPE.values_by_number[bracket.type].name,
+                    'where': bracket.where,
+                    'text' : bracket.text
+                })
+
+    for access in access_log.log.accesses:
+        access_dict = {
+                    'read': "0x{}".format(access.read.content.hex()),
+                    'written' : "0x{}".format(access.written.content.hex()),
+                    'operation' : cartesi_base_pb2._ACCESSOPERATION.values_by_number[access.operation].name,
+                    'proof' : {
+                            'address': access.proof.address,
+                            'log2_size': access.proof.log2_size,
+                            'target_hash': "0x{}".format(access.proof.target_hash.content.hex()),
+                            'root_hash': "0x{}".format(access.proof.root_hash.content.hex()),
+                            'sibling_hashes' : []
+                        }
+                }
+
+        for sibling in access.proof.sibling_hashes:
+            access_dict['proof']['sibling_hashes'].append("0x{}".format(sibling.content.hex()))
+
+        access_log_dict['accesses'].append(access_dict)
+
+    return json.dumps(access_log_dict, indent=4, sort_keys=True)
+
+def dump_step_response_to_file(access_log, open_dump_file):
+    json_dump = dump_step_response_to_json(access_log)
+    open_dump_file.write("\n\n" + '#'*80 + json_dump)
+
+def dump_run_response_to_json(run_resp):
+    resp_dict = {"summaries": [], "hashes": []}
+
+    for val in run_resp.summaries:
+        resp_dict["summaries"].append({
+                                          'tohost': val.tohost,
+                                          'mcycle': val.mcycle
+                                      })
+    for val in run_resp.hashes:
+        resp_dict["hashes"].append("0x{}".format(val.content.hex()))
+
+    return json.dumps(resp_dict, indent=4, sort_keys=True)
+
+def dump_run_response_to_file(run_resp, open_dump_file):
+    json_dump = dump_run_response_to_json(run_resp)
+    open_dump_file.write("\n\n" + '#'*80 + json_dump)
+
 #Initializing log
 LOGGER = get_new_logger(__name__)
 LOGGER = configure_log(LOGGER)
