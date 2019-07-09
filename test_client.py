@@ -9,7 +9,7 @@ import json
 
 #So the cartesi GRPC modules are in path
 import sys
-sys.path.insert(0,'core/cartesi-grpc/py')
+sys.path.insert(0,'core/grpc-interfaces/py')
 
 import core_pb2
 import cartesi_base_pb2
@@ -130,10 +130,6 @@ def dump_run_response_to_json(run_resp):
 
     return json.dumps(resp_dict, indent=4, sort_keys=True)
 
-def address(add):
-    #TODO: validate address
-    return add
-
 def port_number(port):
     try:
         int_port = int(port)
@@ -142,18 +138,18 @@ def port_number(port):
     except:
         raise argparse.ArgumentTypeError("Please provide a valid port from 0 to 65535")
     return port
-   
+
 def get_args():
-    parser = argparse.ArgumentParser(description='GRPC client to the high level emulator API (core manager)')
-    parser.add_argument('--address', '-a', type=address, dest='address', default=DEFAULT_ADD, help="Core manager GRPC server address")
-    parser.add_argument('--port', '-p', type=port_number, dest='port', default=DEFAULT_PORT, help="Core manager GRPC server port")
-    parser.add_argument('--container', '-c', action="store_true", dest="container_server", help="Core manager GPRC server is running from docker container")
+    parser = argparse.ArgumentParser(description='GRPC test client to the machine manager server')
+    parser.add_argument('--address', '-a', dest='address', default=DEFAULT_ADD, help="Machine manager server address")
+    parser.add_argument('--port', '-p', type=port_number, dest='port', default=DEFAULT_PORT, help="Machine manager server port")
+    parser.add_argument('--container', '-c', action="store_true", dest="container_server", help="Fixes file references for when machine manager server is running from docker container")
     args = parser.parse_args()
-    
+
     global CONTAINER_SERVER
     CONTAINER_SERVER = args.container_server
-    
-    return (args.address, args.port) 
+
+    return (args.address, args.port)
 
 def run():
     responses = []
@@ -166,14 +162,14 @@ def run():
         try:
             #NEW SESSION
             print("\n\n\nNEW SESSION TESTS\n\n\n")
-            
+
             #Test new session
             print("Asking to create a new session")
             print("Server response:\n{}".format(stub_high.NewSession(make_new_session_request()).content.hex()))
-            
+
             #RUN SESSION
             print("\n\n\nRUN SESSION TESTS\n\n\n")
-            
+
             #Test run from pristine machine
             final_cycles = [0, 15, 30, 45, 60]
             print("Asking to run the machine for {} final cycle(s) ({})".format(len(final_cycles),final_cycles))
@@ -194,67 +190,77 @@ def run():
             print("Asking to run the machine for {} final cycle(s) ({}), no special effort needed".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
-            
+
             #STEP SESSION
             print("\n\n\nSTEP SESSION TESTS\n\n\n")
-            
+
             #Test step with initial cycle = 0, so step should happen on a new machine
             print("Test step with initial cycle = 0, so step should happen on a new machine")
-            #final_cycles = [20,30]
-            #print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
-            #run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            #print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            final_cycles = [20,30]
+            print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
+            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
             initial_cycle = 0
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(dump_step_response_to_json(stub_high.SessionStep(step_req))))
+
             #Test step with initial cycle < machine cycle and initial cycle > snapshot cycle to force rollback
+
             print("Test step with initial cycle < machine cycle and initial cycle > snapshot cycle to force rollback")
             final_cycles = [15,30]
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
-            initial_cycle = 16 
+            initial_cycle = 16
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(dump_step_response_to_json(stub_high.SessionStep(step_req))))
+
             #Test step with initial cycle < machine cycle and initial cycle < snapshot cycle to force recreating machine
+
             print("Test step with initial cycle < machine cycle and initial cycle < snapshot cycle to force recreating machine")
             final_cycles = [20,30]
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
-            initial_cycle = 1 
+            initial_cycle = 1
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(dump_step_response_to_json(stub_high.SessionStep(step_req))))
+
             #Test step with initial cycle > machine cycle so no special effort should be needed
+
             print("Test step with initial cycle > machine cycle so no special effort should be needed")
             final_cycles = [20,30]
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
-            initial_cycle = 35 
+            initial_cycle = 35
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(dump_step_response_to_json(stub_high.SessionStep(step_req))))
+
             #Test step with initial cycle = machine cycle, so step doesn't even have to make a dummy run to get into machine cycle = initial cycle
+
             print("Test step with initial cycle = machine cycle, so step doesn't even have to make a dummy run to get into machine cycle = initial cycle")
             final_cycles = [20,30]
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
             print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
-            initial_cycle = 30 
+            initial_cycle = 30
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(dump_step_response_to_json(stub_high.SessionStep(step_req))))
-            
-            #embed()            
+
+            #Eventually used for debugging: hook a ipython session in this point
+            #embed()
+
         except Exception as e:
             print("An exception occurred:")
             print(e)
             print(type(e))
-    
+
 if __name__ == '__main__':
     start = time.time()
     print("Starting at {}".format(time.ctime()))
@@ -262,4 +268,3 @@ if __name__ == '__main__':
     print("Ending at {}".format(time.ctime()))
     delta = time.time() - start
     print("Took {} seconds to execute".format(datetime.timedelta(seconds=delta)))
-          
