@@ -8,7 +8,7 @@ import argparse
 
 #So the cartesi GRPC modules are in path
 import sys
-sys.path.insert(0,'core/cartesi-grpc/py')
+sys.path.insert(0,'machine-emulator/lib/cartesi-grpc/py')
 
 import manager_low_pb2_grpc
 import manager_low_pb2

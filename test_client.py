@@ -9,7 +9,7 @@ import json
 
 #So the cartesi GRPC modules are in path
 import sys
-sys.path.insert(0,'core/grpc-interfaces/py')
+sys.path.insert(0,'machine-emulator/lib/cartesi-grpc/py')
 
 import core_pb2
 import cartesi_base_pb2
@@ -37,7 +37,8 @@ BOOTARGS = "bootargs"
 CONTAINER_SERVER = False
 
 TEST_ROM = {
-    BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw -- /bin/echo nice"
+    BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw {} -- /bin/echo nice && ls /mnt",
+    BACKING: "rom-linux.bin"
 }
 
 TEST_RAM = {
@@ -56,22 +57,33 @@ TEST_DRIVES = [
         LENGTH: 46223360,
         BACKING: BACKING_TEST_DRIVE_FILEPATH,
         SHARED: False,
-        LABEL: "root filesystem"
+        LABEL: "root"
     }
 ]
+
+def build_mtdparts_str(drives):
+
+    mtdparts_str = "mtdparts="
+
+    for i,drive in enumerate(drives):
+        mtdparts_str += "flash.%d:-(%s)".format(i, drive[LABEL])
+
+    return mtdparts_str
 
 def make_new_session_request():
     files_dir = NATIVE_BASE_PATH
     if (CONTAINER_SERVER):
         files_dir = CONTAINER_BASE_PATH
 
-    rom_msg = cartesi_base_pb2.ROM(bootargs=TEST_ROM[BOOTARGS])
     ram_msg = cartesi_base_pb2.RAM(length=TEST_RAM[LENGTH], backing=files_dir + TEST_RAM[BACKING])
     drives_msg = []
     for drive in TEST_DRIVES:
-        drive_msg = cartesi_base_pb2.Drive(start=drive[START], length=drive[LENGTH], backing=files_dir + drive[BACKING], 
+        drive_msg = cartesi_base_pb2.Drive(start=drive[START], length=drive[LENGTH], backing=files_dir + drive[BACKING],
                                            shared=drive[SHARED], label=drive[LABEL])
         drives_msg.append(drive_msg)
+    bootargs_str = TEST_ROM[BOOTARGS].format(build_mtdparts_str(TEST_DRIVES))
+    rom_msg = cartesi_base_pb2.ROM(bootargs=bootargs_str, backing=files_dir + TEST_ROM[BACKING])
+
     machine_msg = cartesi_base_pb2.MachineRequest(rom=rom_msg, ram=ram_msg, flash=drives_msg)
     return manager_high_pb2.NewSessionRequest(session_id=TEST_SESSION_ID, machine=machine_msg)
 

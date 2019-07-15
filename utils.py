@@ -44,10 +44,18 @@ def new_cartesi_machine_server(session_id, manager_address):
 
     LOGGER.info("Creating a cartesi machine server with session_id '{}'".format(session_id))
 
-    cmd_line = ["core/src/emulator/server", "-t", SOCKET_TYPE, "-s", session_id, "-m", manager_address]
+    cmd_line = ["machine-emulator/src/server", "-t", SOCKET_TYPE, "-s", session_id, "-m", manager_address]
     LOGGER.debug("Executing {}".format(" ".join(cmd_line)))
-    proc = subprocess.Popen(cmd_line, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    out, err = proc.communicate()
+    try:
+        proc = subprocess.Popen(cmd_line, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        out, err = proc.communicate()
+        LOGGER.debug("\nStdout:\n{}\nStderr:\n{}".format(out.decode("utf-8"), err.decode("utf-8")))
+    except Exception as e:
+        out, err = proc.communicate()
+        err_msg = "Cartesi machine server creation process failed for session_id '{}'".format(session_id)
+        LOGGER.info(err_msg)
+        LOGGER.debug("\nStdout:\n{}\nStderr:\n{}".format(out.decode("utf-8"), err.decode("utf-8")))
+        raise CartesiMachineServerException(err_msg)
     if (proc.returncode == 0):
         LOGGER.info("Cartesi machine server creation process returned for session_id '{}'".format(session_id))
         LOGGER.debug("\nStdout:\n{}\nStderr:\n{}".format(out.decode("utf-8"), err.decode("utf-8")))
