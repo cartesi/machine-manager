@@ -1,6 +1,3 @@
-[submodule "image-ci"]
-	path = image-ci
-	url = git@github.com:cartesi/image-ci.git
 [submodule "machine-emulator"]
 	path = machine-emulator
 	url = git@github.com:cartesi/machine-emulator.git

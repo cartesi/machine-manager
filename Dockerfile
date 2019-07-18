@@ -25,8 +25,6 @@ RUN \
     cd $EMU_BASE && \
     make distclean && \
     `make env` && \
-    echo $LD_LIBRARY_PATH && \
-    echo $PATH && \
     make dep && \
     make
 
@@ -37,4 +35,4 @@ RUN \
 
 #Changing directory to base
 WORKDIR $BASE
-#CMD echo $PATH && echo $LD_LIBRARY_PATH && python3 manager_server.py -a 0.0.0.0
+CMD bash -c "cd $EMU_BASE && \`make env\` && cd $BASE && python3 manager_server.py -a 0.0.0.0"
