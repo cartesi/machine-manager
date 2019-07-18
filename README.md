@@ -12,7 +12,7 @@ You may also want to install all the dependencies in your system to compile the 
 
 ### Requirements
 
-- Python >= 3.6 
+- Python >= 3.6
 - Python modules described in the requirements.txt file
 - [Machine emulator](https://github.com/cartesi/machine-emulator)
 
@@ -164,4 +164,4 @@ Please note we have a code of conduct, please follow it in all your interactions
 
 ## Acknowledgments
 
-- Original work 
+- Original work
