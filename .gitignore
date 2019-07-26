@@ -105,3 +105,6 @@ venv.bak/
 
 # virtualenv
 vir/*
+
+# test-files
+test-files/*

@@ -9,7 +9,7 @@ import json
 
 #So the cartesi GRPC modules are in path
 import sys
-sys.path.insert(0,'machine-emulator/lib/cartesi-grpc/py')
+sys.path.insert(0,'machine-emulator/lib/grpc-interfaces/py')
 
 import core_pb2
 import cartesi_base_pb2
@@ -31,8 +31,8 @@ START = "start"
 BACKING = "backing"
 LENGTH = "length"
 SHARED = "shared"
-LABEL = "label"
 BOOTARGS = "bootargs"
+LABEL = "label"
 
 CONTAINER_SERVER = False
 
@@ -57,7 +57,7 @@ TEST_DRIVES = [
         LENGTH: 46223360,
         BACKING: BACKING_TEST_DRIVE_FILEPATH,
         SHARED: False,
-        LABEL: "root"
+        LABEL: "rootfs"
     }
 ]
 
@@ -79,7 +79,7 @@ def make_new_session_request():
     drives_msg = []
     for drive in TEST_DRIVES:
         drive_msg = cartesi_base_pb2.Drive(start=drive[START], length=drive[LENGTH], backing=files_dir + drive[BACKING],
-                                           shared=drive[SHARED], label=drive[LABEL])
+                                           shared=drive[SHARED])
         drives_msg.append(drive_msg)
     bootargs_str = TEST_ROM[BOOTARGS].format(build_mtdparts_str(TEST_DRIVES))
     rom_msg = cartesi_base_pb2.ROM(bootargs=bootargs_str, backing=files_dir + TEST_ROM[BACKING])

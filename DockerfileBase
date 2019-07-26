@@ -1,8 +1,13 @@
 FROM ubuntu:18.04
 
-MAINTAINER Diego Nehab <diego.nehab@gmail.com>
+MAINTAINER Carlo Fragni <carlo@cartesi.io>
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+ENV BASE=/opt/machine-manager
+ENV EMU_BASE=$BASE/machine-emulator
+
+RUN mkdir $BASE
 
 # Install basic development tools
 # ----------------------------------------------------
@@ -10,5 +15,19 @@ RUN \
     apt-get update && \
     apt-get install --no-install-recommends -y \
         build-essential wget git libreadline-dev libboost-container-dev \
-        libboost-program-options-dev ca-certificates autoconf libtool automake \
+        libboost-program-options-dev ca-certificates libtool automake \
         pkg-config
+
+# Copy emulator directory and build it
+# ----------------------------------------------------
+COPY ./machine-emulator $EMU_BASE
+
+#Building the emulator
+SHELL ["/bin/bash", "-c"]
+RUN \
+    cd $EMU_BASE && \
+    make distclean && \
+    `make env` && \
+    make downloads && \
+    make dep && \
+    make
