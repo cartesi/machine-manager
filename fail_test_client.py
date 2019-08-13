@@ -1,3 +1,16 @@
+"""
+Copyright 2019 Cartesi Pte. Ltd.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+"""
+
 from __future__ import print_function
 
 import grpc
@@ -20,7 +33,7 @@ import argparse
 from IPython import embed
 
 TEST_SESSION_ID = "test_new_session_id"
-START = "start" 
+START = "start"
 BACKING = "backing"
 LENGTH = "length"
 SHARED = "shared"
@@ -34,7 +47,6 @@ TEST_ROM = {
 TEST_RAM = {
     LENGTH: 64 << 20, #2**26 or 67108864
     BACKING: "/home/carlo/crashlabs/core/src/emulator/kernel.bin"
-    
 }
 
 BACKING_TEST_DRIVE_FILEPATH = "/home/carlo/crashlabs/core/src/emulator/rootfs.ext2"
@@ -54,7 +66,7 @@ def make_new_session_request():
     ram_msg = cartesi_base_pb2.RAM(length=TEST_RAM[LENGTH], backing=TEST_RAM[BACKING])
     drives_msg = []
     for drive in TEST_DRIVES:
-        drive_msg = cartesi_base_pb2.Drive(start=drive[START], length=drive[LENGTH], backing=drive[BACKING], 
+        drive_msg = cartesi_base_pb2.Drive(start=drive[START], length=drive[LENGTH], backing=drive[BACKING],
                                            shared=drive[SHARED], label=drive[LABEL])
         drives_msg.append(drive_msg)
     machine_msg = cartesi_base_pb2.MachineRequest(rom=rom_msg, ram=ram_msg, flash=drives_msg)
@@ -72,7 +84,7 @@ def port_number(port):
     except:
         raise argparse.ArgumentTypeError("Please provide a valid port from 0 to 65535")
     return port
-   
+
 def get_args():
     parser = argparse.ArgumentParser(description='GRPC client to the high level emulator API (core manager)')
     parser.add_argument('server_add', type=address, help="Core manager GRPC server address")
@@ -81,14 +93,14 @@ def get_args():
 
     srv_add = "localhost"
     srv_port = "50051"
-    
+
     if args.server_add:
         srv_add = args.server_add
 
     if args.server_port:
         srv_port = args.server_port
 
-    return (srv_add, srv_port) 
+    return (srv_add, srv_port)
 
 def run():
     response, response2, response3, response4 = (None, None, None, None)
@@ -98,10 +110,10 @@ def run():
     with grpc.insecure_channel(conn_str) as channel:
         stub_low = manager_low_pb2_grpc.MachineManagerLowStub(channel)
         stub_high = manager_high_pb2_grpc.MachineManagerHighStub(channel)
-        try:           
+        try:
             #Test new session with problem on drive start address
             response = stub_high.NewSession(make_new_session_request())
-            #embed()            
+            #embed()
         except Exception as e:
             print("An exception occurred:")
             print(e)
@@ -113,12 +125,12 @@ def run():
         except Exception as e:
             print("An exception occurred:")
             print(e)
-            print(type(e))           
-            
+            print(type(e))
+
     if (response):
         print("Core manager client received: " + str(response))
     if (response2):
         print("Core manager client received: " + str(response2))
-    
+
 if __name__ == '__main__':
     run()
