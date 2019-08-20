@@ -24,4 +24,4 @@ RUN \
 
 #Changing directory to base
 WORKDIR $BASE
-CMD bash -c "cd $EMU_BASE && \`make env\` && cd $BASE && python3 manager_server.py -a 0.0.0.0"
+CMD bash -c "python3 manager_server.py -a 0.0.0.0"

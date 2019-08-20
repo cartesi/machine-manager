@@ -16,7 +16,7 @@ RUN \
     apt-get install --no-install-recommends -y \
         build-essential wget git libreadline-dev libboost-container-dev \
         libboost-program-options-dev ca-certificates libtool automake \
-        pkg-config
+        pkg-config patchelf
 
 # Copy emulator directory and build it
 # ----------------------------------------------------
@@ -24,10 +24,11 @@ COPY ./machine-emulator $EMU_BASE
 
 #Building the emulator
 SHELL ["/bin/bash", "-c"]
-RUN \
-    cd $EMU_BASE && \
-    make distclean && \
-    `make env` && \
-    make downloads && \
-    make dep && \
-    make
+WORKDIR $EMU_BASE
+RUN make distclean
+# No need to make submodules as they were already downloaded when checking out machine-manager
+RUN make downloads
+RUN make dep
+RUN make
+RUN make install
+
