@@ -25,10 +25,11 @@ COPY ./machine-emulator $EMU_BASE
 #Building the emulator
 SHELL ["/bin/bash", "-c"]
 WORKDIR $EMU_BASE
-RUN make distclean
 # No need to make submodules as they were already downloaded when checking out machine-manager
-RUN make downloads
-RUN make dep
-RUN make
-RUN make install
+
+RUN make distclean && \
+    make downloads && \
+    make dep && \
+    make && \
+    make install
 
