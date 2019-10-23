@@ -62,7 +62,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             LOGGER.info("New session requested with session_id: {}".format(session_id))
 
             #Return the fixed initial hash
-            return bytes.fromhex("00")
+            return cartesi_base_pb2.Hash(content=bytes.fromhex("00"))
             #return self.session_registry_manager.new_session(session_id, machine_req)
 
         #No session with provided id or address issue
@@ -82,10 +82,10 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
                 return
 
             #Return the fixed session run result
-            summaries = [{"mcycle": 0, "tohost": 0}, {"mcycle": 0, "tohost": 0}]
-            hashes = [bytes.fromhex("00"), bytes.fromhex("00")]
+            summaries = [cartesi_base_pb2.RunResponse(), cartesi_base_pb2.RunResponse()]
+            hashes = [cartesi_base_pb2.Hash(content=bytes.fromhex("00")), cartesi_base_pb2.Hash(content=bytes.fromhex("00"))]
             if DEFECTIVE:
-                hashes = [bytes.fromhex("00"), bytes.fromhex("01")]
+                hashes = [cartesi_base_pb2.Hash(content=bytes.fromhex("00")), cartesi_base_pb2.Hash(content=bytes.fromhex("01"))]
             run_result = utils.make_session_run_result(summaries, hashes)
             return run_result
             #return self.session_registry_manager.run_session(session_id, final_cycles)
