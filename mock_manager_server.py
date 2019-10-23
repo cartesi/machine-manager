@@ -113,8 +113,9 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             if self.ServerShuttingDown(context):
                 return
 
-            #Return the fixed session step result
-            return self.session_registry_manager.step_session(session_id, initial_cycle)
+            #Return the empty session step result
+            return manager_high_pb2.SessionStepResult()
+            #return self.session_registry_manager.step_session(session_id, initial_cycle)
 
             session_id = request.session_id
             initial_cycle = request.initial_cycle
