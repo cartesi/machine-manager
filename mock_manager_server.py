@@ -12,6 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 from concurrent import futures
+import signal
 import time
 import math
 import grpc
@@ -30,6 +31,12 @@ import manager_high_pb2
 import cartesi_base_pb2
 import utils
 from session_registry import SessionIdException, AddressException, RollbackException
+
+# docker graceful shutdown, raise a KeyboardInterrupt in case of SIGTERM
+def handle_sigterm(*args):
+    raise KeyboardInterrupt()
+
+signal.signal(signal.SIGTERM, handle_sigterm)
 
 LOGGER = utils.get_new_logger(__name__)
 LOGGER = utils.configure_log(LOGGER)
