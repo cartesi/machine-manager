@@ -108,3 +108,6 @@ vir/*
 
 # test-files
 test-files/*
+
+# editor
+.vscode
