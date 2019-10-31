@@ -19,6 +19,7 @@ import grpc
 import sys
 import traceback
 import argparse
+from grpc_reflection.v1alpha import reflection
 
 #So the cartesi GRPC modules are in path
 import sys
@@ -191,6 +192,12 @@ def serve(args):
     manager_low_pb2_grpc.add_MachineManagerLowServicer_to_server(_MachineManagerLow(session_registry_manager),
                                                       server)
 
+    SERVICE_NAMES = (
+        manager_high_pb2.DESCRIPTOR.services_by_name['MachineManagerHigh'].full_name,
+        manager_low_pb2.DESCRIPTOR.services_by_name['MachineManagerLow'].full_name,
+        reflection.SERVICE_NAME,
+    )
+    reflection.enable_server_reflection(SERVICE_NAMES, server)
     server.add_insecure_port(manager_address)
     server.start()
     LOGGER.info("Server started, listening on address {} and port {}".format(listening_add, listening_port))

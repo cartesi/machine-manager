@@ -1,6 +1,6 @@
 FROM cartesi/image-emulator-base
 
-MAINTAINER Carlo Fragni <carlo@cartesi.io>
+LABEL maintainer="Carlo Fragni <carlo@cartesi.io>"
 
 ENV BASE=/opt/machine-manager
 ENV EMU_BASE=$BASE/machine-emulator
