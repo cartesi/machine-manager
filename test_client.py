@@ -106,6 +106,18 @@ def make_new_session_run_request(session_id, final_cycles):
 def make_new_session_step_request(session_id, initial_cycle):
     return manager_high_pb2.SessionStepRequest(session_id=session_id, initial_cycle=initial_cycle)
 
+def make_new_session_get_proof_request(session_id, address, log2_size):
+    proof_req = cartesi_base_pb2.GetProofRequest(address=address, log2_size=log2_size)
+    return manager_high_pb2.SessionGetProofRequest(session_id=session_id, target=proof_req)
+
+def make_new_session_read_memory_request(session_id, mem_addr, data_length):
+    read_mem_req = cartesi_base_pb2.ReadMemoryRequest(address=mem_addr, length=data_length)
+    return manager_high_pb2.SessionReadMemoryRequest(session_id=session_id, position=read_mem_req)
+
+def make_new_session_write_memory_request(session_id, mem_addr, data):
+    write_mem_req = cartesi_base_pb2.WriteMemoryRequest(address=mem_addr, data=data)
+    return manager_high_pb2.SessionWriteMemoryRequest(session_id=session_id, position=write_mem_req)
+
 def dump_step_response_to_json(access_log):
     access_log_dict = {'accesses':[], 'notes':[], 'brackets':[]}
 
@@ -154,6 +166,29 @@ def dump_run_response_to_json(run_resp):
         resp_dict["hashes"].append("0x{}".format(val.content.hex()))
 
     return json.dumps(resp_dict, indent=4, sort_keys=True)
+
+def dump_proof_to_json(proof):
+
+    proof_dict = {
+        'address': proof.address,
+        'log2_size': proof.log2_size,
+        'target_hash': "0x{}".format(proof.target_hash.content.hex()),
+        'root_hash': "0x{}".format(proof.root_hash.content.hex()),
+        'sibling_hashes' : []
+    }
+
+    for sibling in proof.sibling_hashes:
+        proof_dict['sibling_hashes'].append("0x{}".format(sibling.content.hex()))
+
+    return json.dumps(proof_dict, indent=4, sort_keys=True)
+
+def dump_read_mem_response_to_json(read_mem_resp):
+    resp_dict = {"read_content": {"data": "0x{}".format(read_mem_resp.read_content.data.hex())}}
+
+    return json.dumps(resp_dict, indent=4, sort_keys=True)
+
+def dump_write_mem_response_to_json(write_mem_resp):
+    return json.dumps("{}".format(write_mem_resp), indent=4, sort_keys=True)
 
 def port_number(port):
     try:
@@ -277,6 +312,39 @@ def run():
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
             print("Server response:\n{}".format(dump_step_response_to_json(stub_high.SessionStep(step_req))))
+
+            #Test get proof
+
+            addr, log2_size = (288, 3)
+            print("Asking for proof on address {} with log2_size {}".format(addr, log2_size))
+            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, addr, log2_size)
+            print("Server response:\n{}".format(dump_proof_to_json(stub_high.SessionGetProof(proof_req))))
+
+            addr, log2_size = (288, 4)
+            print("Asking for proof on address {} with log2_size {}".format(addr, log2_size))
+            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, addr, log2_size)
+            print("Server response:\n{}".format(dump_proof_to_json(stub_high.SessionGetProof(proof_req))))
+
+            addr, log2_size = (1<<63, 3)
+            print("Asking for proof on address {} with log2_size {}".format(addr, log2_size))
+            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, addr, log2_size)
+            print("Server response:\n{}".format(dump_proof_to_json(stub_high.SessionGetProof(proof_req))))
+
+            #Test read and write mem
+            mem_addr, data_length = (1<<63, 16)
+            print("Asking to read memory starting on address {} for lenght {}".format(mem_addr, data_length))
+            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, mem_addr, data_length)
+            print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
+
+            mem_addr, data = (1<<63, bytes.fromhex('aeafacaacaba')) #b'Hello')
+            print("Asking to write memory starting on address {} with data {}".format(mem_addr, data))
+            write_mem_req = make_new_session_write_memory_request(TEST_SESSION_ID, mem_addr, data)
+            print("Server response:\n{}".format(dump_write_mem_response_to_json(stub_high.SessionWriteMemory(write_mem_req))))
+
+            mem_addr, data_length = (1<<63, 16)
+            print("Asking to read memory starting on address {} for lenght {}".format(mem_addr, data_length))
+            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, mem_addr, data_length)
+            print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
 
             #Eventually used for debugging: hook a ipython session in this point
             #embed()

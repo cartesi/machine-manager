@@ -126,6 +126,78 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             context.set_details('An exception with message "{}" was raised!'.format(e))
             context.set_code(grpc.StatusCode.UNKNOWN)
 
+
+    def SessionReadMemory(self, request, context):
+        try:
+            if self.ServerShuttingDown(context):
+                return
+
+            session_id = request.session_id
+            read_mem_req = request.position
+            LOGGER.info("New session memory read requested for session_id {} on address {} with length {}".format(session_id, read_mem_req.address, read_mem_req.length))
+
+            #Execute and return the session memory read result
+            return self.session_registry_manager.session_read_mem(session_id, read_mem_req)
+
+        #No session with provided id or address issue
+        except (SessionIdException, AddressException) as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Generic error catch
+        except Exception as e:
+            LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
+            context.set_details('An exception with message "{}" was raised!'.format(e))
+            context.set_code(grpc.StatusCode.UNKNOWN)
+
+    def SessionWriteMemory(self, request, context):
+        try:
+            if self.ServerShuttingDown(context):
+                return
+
+            session_id = request.session_id
+            write_mem_req = request.position
+            LOGGER.info("New session memory write requested for session_id {} on address {} with data {}".format(session_id, write_mem_req.address, write_mem_req.data))
+
+            #Execute and return the session memory write result
+            return self.session_registry_manager.session_write_mem(session_id, write_mem_req)
+
+        #No session with provided id or address issue
+        except (SessionIdException, AddressException) as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Generic error catch
+        except Exception as e:
+            LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
+            context.set_details('An exception with message "{}" was raised!'.format(e))
+            context.set_code(grpc.StatusCode.UNKNOWN)
+
+    def SessionGetProof(self, request, context):
+        try:
+            if self.ServerShuttingDown(context):
+                return
+
+            session_id = request.session_id
+            proof_req = request.target
+            LOGGER.info("New session proof requested for session_id {} on address {} with log2_size {}".format(session_id, proof_req.address, proof_req.log2_size))
+
+            #Execute and return the session proof result
+            return self.session_registry_manager.session_get_proof(session_id, proof_req)
+
+        #No session with provided id or address issue
+        except (SessionIdException, AddressException) as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Generic error catch
+        except Exception as e:
+            LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
+            context.set_details('An exception with message "{}" was raised!'.format(e))
+            context.set_code(grpc.StatusCode.UNKNOWN)
+
+
+
 class _MachineManagerLow(manager_low_pb2_grpc.MachineManagerLowServicer):
 
     def __init__(self, session_registry_manager):

@@ -158,6 +158,72 @@ class SessionRegistryManager:
         #Returning SessionStepResult
         return step_result
 
+    def session_read_mem(self, session_id, read_mem_req):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+
+        read_result = None
+
+        LOGGER.debug("Acquiring lock for session {}".format(session_id))
+        with self.registry[session_id].lock:
+
+            #Read desired memory position
+            read_result =  utils.make_session_read_memory_result(utils.read_machine_memory(session_id, self.registry[session_id].address, read_mem_req))
+
+        #Checking if log level is DEBUG or more detailed since building the
+        #debug info is expensive
+        if LOGGER.getEffectiveLevel() <= utils.logging.DEBUG:
+            LOGGER.debug(utils.dump_read_mem_response_to_json(read_result))
+
+        #Returning SessionReadMemoryResult
+        return read_result
+
+    def session_write_mem(self, session_id, write_mem_req):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+
+        write_result = None
+
+        LOGGER.debug("Acquiring lock for session {}".format(session_id))
+        with self.registry[session_id].lock:
+
+            #Write to desired memory position
+            write_result =  utils.write_machine_memory(session_id, self.registry[session_id].address, write_mem_req)
+
+        #Checking if log level is DEBUG or more detailed since building the
+        #debug info is expensive
+        if LOGGER.getEffectiveLevel() <= utils.logging.DEBUG:
+            LOGGER.debug(utils.dump_write_mem_response_to_json(write_result))
+
+        #Returning CartesiBase Void
+        return write_result
+
+    def session_get_proof(self, session_id, proof_req):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+
+        proof_result = None
+
+        LOGGER.debug("Acquiring lock for session {}".format(session_id))
+        with self.registry[session_id].lock:
+
+            #Getting required proof
+            proof_result =  utils.get_machine_proof(session_id, self.registry[session_id].address, proof_req)
+
+        #Checking if log level is DEBUG or more detailed since building the
+        #debug info is expensive
+        if LOGGER.getEffectiveLevel() <= utils.logging.DEBUG:
+            LOGGER.debug(utils.dump_get_proof_response_to_json(proof_result))
+
+        #Returning CartesiBase Proof
+        return proof_result
+
 
     """
     Here starts the "internal" API, use the methods bellow taking the right precautions such as holding a lock a session

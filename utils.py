@@ -134,11 +134,38 @@ def step_machine(session_id, address):
         LOGGER.debug("Cartesi machine step complete for session_id '{}'".format(session_id))
         return response
 
+def read_machine_memory(session_id, address, read_mem_req):
+    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
+    with grpc.insecure_channel(address) as channel:
+        stub = core_pb2_grpc.MachineStub(channel)
+        response = stub.ReadMemory(read_mem_req)
+        LOGGER.debug("Cartesi machine memory read for session_id '{}', desired mem address {} and length {}".format(session_id, read_mem_req.address, read_mem_req.length))
+        return response
+
+def write_machine_memory(session_id, address, write_mem_req):
+    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
+    with grpc.insecure_channel(address) as channel:
+        stub = core_pb2_grpc.MachineStub(channel)
+        response = stub.WriteMemory(write_mem_req)
+        LOGGER.debug("Cartesi machine memory written for session_id '{}', desired mem address {} and data {}".format(session_id, write_mem_req.address, write_mem_req.data))
+        return response
+
+def get_machine_proof(session_id, address, proof_req):
+    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
+    with grpc.insecure_channel(address) as channel:
+        stub = core_pb2_grpc.MachineStub(channel)
+        response = stub.GetProof(proof_req)
+        LOGGER.debug("Got Cartesi machine proof for session_id '{}', desired mem address {} and log2_size {}".format(session_id, proof_req.address, proof_req.log2_size))
+        return response
+
 def make_session_run_result(summaries, hashes):
     return manager_high_pb2.SessionRunResult(summaries=summaries, hashes=hashes)
 
 def make_session_step_result(access_log):
     return manager_high_pb2.SessionStepResult(log=access_log)
+
+def make_session_read_memory_result(read_mem_resp):
+    return manager_high_pb2.SessionReadMemoryResult(read_content=read_mem_resp)
 
 class CycleException(Exception):
     pass
@@ -219,6 +246,29 @@ def dump_run_response_to_json(run_resp):
 def dump_run_response_to_file(run_resp, open_dump_file):
     json_dump = dump_run_response_to_json(run_resp)
     open_dump_file.write("\n\n" + '#'*80 + json_dump)
+
+def dump_get_proof_response_to_json(proof_resp):
+
+    resp_dict = {
+        'address': proof_resp.address,
+        'log2_size': proof_resp.log2_size,
+        'target_hash': "0x{}".format(proof_resp.target_hash.content.hex()),
+        'root_hash': "0x{}".format(proof_resp.root_hash.content.hex()),
+        'sibling_hashes' : []
+    }
+
+    for sibling in proof_resp.sibling_hashes:
+        resp_dict['sibling_hashes'].append("0x{}".format(sibling.content.hex()))
+
+    return json.dumps(resp_dict, indent=4, sort_keys=True)
+
+def dump_read_mem_response_to_json(read_mem_resp):
+    resp_dict = {"data": "0x{}".format(read_mem_resp.read_content.data.hex())}
+
+    return json.dumps(resp_dict, indent=4, sort_keys=True)
+
+def dump_write_mem_response_to_json(write_mem_resp):
+    return json.dumps("{}".format(write_mem_resp), indent=4, sort_keys=True)
 
 #Initializing log
 LOGGER = get_new_logger(__name__)
