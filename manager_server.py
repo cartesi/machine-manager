@@ -12,16 +12,18 @@ specific language governing permissions and limitations under the License.
 """
 
 from concurrent import futures
+import signal
 import time
 import math
 import grpc
 import sys
 import traceback
 import argparse
+from grpc_reflection.v1alpha import reflection
 
 #So the cartesi GRPC modules are in path
 import sys
-sys.path.insert(0,'machine-emulator/lib/grpc-interfaces/py')
+sys.path.insert(0,'lib/grpc-interfaces/py')
 
 import manager_low_pb2_grpc
 import manager_low_pb2
@@ -30,6 +32,12 @@ import manager_high_pb2
 import cartesi_base_pb2
 import utils
 from session_registry import SessionIdException, AddressException, RollbackException
+
+# docker graceful shutdown, raise a KeyboardInterrupt in case of SIGTERM
+def handle_sigterm(*args):
+    raise KeyboardInterrupt()
+
+signal.signal(signal.SIGTERM, handle_sigterm)
 
 LOGGER = utils.get_new_logger(__name__)
 LOGGER = utils.configure_log(LOGGER)
@@ -244,6 +252,12 @@ def serve(args):
     manager_low_pb2_grpc.add_MachineManagerLowServicer_to_server(_MachineManagerLow(session_registry_manager),
                                                       server)
 
+    SERVICE_NAMES = (
+        manager_high_pb2.DESCRIPTOR.services_by_name['MachineManagerHigh'].full_name,
+        manager_low_pb2.DESCRIPTOR.services_by_name['MachineManagerLow'].full_name,
+        reflection.SERVICE_NAME,
+    )
+    reflection.enable_server_reflection(SERVICE_NAMES, server)
     server.add_insecure_port(manager_address)
     server.start()
     LOGGER.info("Server started, listening on address {} and port {}".format(listening_add, listening_port))

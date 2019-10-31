@@ -22,7 +22,7 @@ import json
 
 #So the cartesi GRPC modules are in path
 import sys
-sys.path.insert(0,'machine-emulator/lib/grpc-interfaces/py')
+sys.path.insert(0,'lib/grpc-interfaces/py')
 
 import core_pb2
 import cartesi_base_pb2

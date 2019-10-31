@@ -23,7 +23,7 @@ from grpc_reflection.v1alpha import reflection
 
 #So the cartesi GRPC modules are in path
 import sys
-sys.path.insert(0,'machine-emulator/lib/grpc-interfaces/py')
+sys.path.insert(0,'lib/grpc-interfaces/py')
 
 import manager_low_pb2_grpc
 import manager_low_pb2

@@ -9,12 +9,18 @@ jobs:
           submodules: recursive
           token: ${{ secrets.CI_TOKEN }}
 
-      - name: Build Docker image
-        run: docker build . -t cartesi/machine-manager-mock:latest -f DockerfileMock
       - name: Login to Docker Hub
         run: echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Machine Manager
+        run: docker build . -t cartesi/machine-manager:latest
+      - name: Push to Docker Hub
+        run: docker push cartesi/machine-manager:latest
+
+      - name: Build Mock Server
+        run: docker build . -t cartesi/machine-manager-mock:latest -f DockerfileMock
       - name: Push to Docker Hub
         run: docker push cartesi/machine-manager-mock:latest
