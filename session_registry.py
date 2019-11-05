@@ -73,31 +73,15 @@ class SessionRegistryManager:
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
 
+            #Running up to the first cycle and making a snapshot
             first_c = desired_cycles.pop(0)
-
-            #Checking machine cycle is after first required cycle
-            if (self.registry[session_id].cycle > first_c):
-                #It is, checking if there is a snapshot image
-                if (self.registry[session_id].snapshot_cycle != None):
-                    #There is, checking if snapshot cycle is before or after required cycle
-                    if (self.registry[session_id].snapshot_cycle <= first_c):
-                        #It is, rolling back
-                        self.rollback_machine(session_id)
-                    else:
-                        #It isn't, recreating machine from scratch
-                        self.recreate_machine(session_id)
-                else:
-                    #There isn't, recreating machine from scratch
-                    self.recreate_machine(session_id)
-
-            #Make execute and make machine snapshot
-            summaries.append(self.run_and_update_registry_cycle(session_id, first_c))
+            summaries.append(self.run_machine_to_desired_cyle(session_id, first_c))
             self.snapshot_machine(session_id)
 
             #Getting hash
             hashes.append(self.get_machine_root_hash(session_id))
 
-            #Executing additional runs on given final_cycles
+            #Executing additional runs for given final_cycles
             for c in desired_cycles:
                 summaries.append(self.run_and_update_registry_cycle(session_id, c))
                 hashes.append(self.get_machine_root_hash(session_id))
@@ -127,25 +111,7 @@ class SessionRegistryManager:
             #step initial cycle so we can then step and retrieve the access log of that specific cycle
             if (self.registry[session_id].cycle != initial_cycle):
                 #It is different, putting machine in initial_cycle
-
-                #Checking machine cycle is after required cycle
-                if (self.registry[session_id].cycle > initial_cycle):
-                    #It is, checking if there is a snapshot image
-                    if (self.registry[session_id].snapshot_cycle != None):
-                        #There is, checking if snapshot cycle is before or after required cycle
-                        if (self.registry[session_id].snapshot_cycle <= initial_cycle):
-                            #It is, rolling back
-                            self.rollback_machine(session_id)
-                        else:
-                            #It isn't, recreating machine from scratch
-                            self.recreate_machine(session_id)
-                    else:
-                        #There isn't, recreating machine from scratch
-                        self.recreate_machine(session_id)
-
-                #Execute up to initial_cycle if initial_cycle > 0
-                if (initial_cycle > 0):
-                    self.run_and_update_registry_cycle(session_id, initial_cycle)
+                self.run_machine_to_desired_cyle(session_id, initial_cycle)
 
             #The machine is in initial_cycle, stepping now
             step_result =  utils.make_session_step_result(self.step_and_update_registry_cycle(session_id))
@@ -158,7 +124,7 @@ class SessionRegistryManager:
         #Returning SessionStepResult
         return step_result
 
-    def session_read_mem(self, session_id, read_mem_req):
+    def session_read_mem(self, session_id, cycle, read_mem_req):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
@@ -168,6 +134,10 @@ class SessionRegistryManager:
 
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
+            #If the machine is not in the desired cycle, put it in the desired cycle
+            if (self.registry[session_id].cycle != cycle):
+                #It is different, putting machine in the desired cycle
+                self.run_machine_to_desired_cyle(session_id, cycle)
 
             #Read desired memory position
             read_result =  utils.make_session_read_memory_result(utils.read_machine_memory(session_id, self.registry[session_id].address, read_mem_req))
@@ -180,7 +150,7 @@ class SessionRegistryManager:
         #Returning SessionReadMemoryResult
         return read_result
 
-    def session_write_mem(self, session_id, write_mem_req):
+    def session_write_mem(self, session_id, cycle, write_mem_req):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
@@ -190,6 +160,10 @@ class SessionRegistryManager:
 
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
+            #If the machine is not in the desired cycle, put it in the desired cycle
+            if (self.registry[session_id].cycle != cycle):
+                #It is different, putting machine in the desired cycle
+                self.run_machine_to_desired_cyle(session_id, cycle)
 
             #Write to desired memory position
             write_result =  utils.write_machine_memory(session_id, self.registry[session_id].address, write_mem_req)
@@ -202,7 +176,7 @@ class SessionRegistryManager:
         #Returning CartesiBase Void
         return write_result
 
-    def session_get_proof(self, session_id, proof_req):
+    def session_get_proof(self, session_id, cycle, proof_req):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
@@ -211,7 +185,12 @@ class SessionRegistryManager:
         proof_result = None
 
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
+
         with self.registry[session_id].lock:
+            #If the machine is not in the desired cycle, put it in the desired cycle
+            if (self.registry[session_id].cycle != cycle):
+                #It is different, putting machine in the desired cycle
+                self.run_machine_to_desired_cyle(session_id, cycle)
 
             #Getting required proof
             proof_result =  utils.get_machine_proof(session_id, self.registry[session_id].address, proof_req)
@@ -419,6 +398,29 @@ class SessionRegistryManager:
 
         return result
 
+    def run_machine_to_desired_cyle(self, session_id, c):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+
+        #Checking machine cycle is after required cycle
+        if (self.registry[session_id].cycle > c):
+            #It is, checking if there is a snapshot image
+            if (self.registry[session_id].snapshot_cycle != None):
+                #There is, checking if snapshot cycle is before or after required cycle
+                if (self.registry[session_id].snapshot_cycle <= c):
+                    #It is, rolling back
+                    self.rollback_machine(session_id)
+                else:
+                    #It isn't, recreating machine from scratch
+                    self.recreate_machine(session_id)
+            else:
+                #There isn't, recreating machine from scratch
+                self.recreate_machine(session_id)
+
+        #Execute run and return the result
+        return self.run_and_update_registry_cycle(session_id, c)
 
 class CartesiSession:
 

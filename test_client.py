@@ -106,17 +106,17 @@ def make_new_session_run_request(session_id, final_cycles):
 def make_new_session_step_request(session_id, initial_cycle):
     return manager_high_pb2.SessionStepRequest(session_id=session_id, initial_cycle=initial_cycle)
 
-def make_new_session_get_proof_request(session_id, address, log2_size):
+def make_new_session_get_proof_request(session_id, cycle, address, log2_size):
     proof_req = cartesi_base_pb2.GetProofRequest(address=address, log2_size=log2_size)
-    return manager_high_pb2.SessionGetProofRequest(session_id=session_id, target=proof_req)
+    return manager_high_pb2.SessionGetProofRequest(session_id=session_id, cycle=cycle, target=proof_req)
 
-def make_new_session_read_memory_request(session_id, mem_addr, data_length):
+def make_new_session_read_memory_request(session_id, cycle, mem_addr, data_length):
     read_mem_req = cartesi_base_pb2.ReadMemoryRequest(address=mem_addr, length=data_length)
-    return manager_high_pb2.SessionReadMemoryRequest(session_id=session_id, position=read_mem_req)
+    return manager_high_pb2.SessionReadMemoryRequest(session_id=session_id, cycle=cycle, position=read_mem_req)
 
-def make_new_session_write_memory_request(session_id, mem_addr, data):
+def make_new_session_write_memory_request(session_id, cycle, mem_addr, data):
     write_mem_req = cartesi_base_pb2.WriteMemoryRequest(address=mem_addr, data=data)
-    return manager_high_pb2.SessionWriteMemoryRequest(session_id=session_id, position=write_mem_req)
+    return manager_high_pb2.SessionWriteMemoryRequest(session_id=session_id, cycle=cycle, position=write_mem_req)
 
 def dump_step_response_to_json(access_log):
     access_log_dict = {'accesses':[], 'notes':[], 'brackets':[]}
@@ -315,35 +315,55 @@ def run():
 
             #Test get proof
 
-            addr, log2_size = (288, 3)
-            print("Asking for proof on address {} with log2_size {}".format(addr, log2_size))
-            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, addr, log2_size)
+            cycle, addr, log2_size = (30, 288, 3)
+            print("Asking for proof on cyle {} for address {} with log2_size {}".format(cycle, addr, log2_size))
+            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, cycle, addr, log2_size)
             print("Server response:\n{}".format(dump_proof_to_json(stub_high.SessionGetProof(proof_req))))
 
-            addr, log2_size = (288, 4)
-            print("Asking for proof on address {} with log2_size {}".format(addr, log2_size))
-            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, addr, log2_size)
+            cyle, addr, log2_size = (30, 288, 4)
+            print("Asking for proof on cyle {} for address {} with log2_size {}".format(cycle, addr, log2_size))
+            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, cycle, addr, log2_size)
             print("Server response:\n{}".format(dump_proof_to_json(stub_high.SessionGetProof(proof_req))))
 
-            addr, log2_size = (1<<63, 3)
-            print("Asking for proof on address {} with log2_size {}".format(addr, log2_size))
-            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, addr, log2_size)
+            cyle, addr, log2_size = (0, 1<<63, 3)
+            print("Asking for proof on cyle {} for address {} with log2_size {}".format(cycle, addr, log2_size))
+            proof_req = make_new_session_get_proof_request(TEST_SESSION_ID, cycle, addr, log2_size)
             print("Server response:\n{}".format(dump_proof_to_json(stub_high.SessionGetProof(proof_req))))
 
             #Test read and write mem
-            mem_addr, data_length = (1<<63, 16)
-            print("Asking to read memory starting on address {} for lenght {}".format(mem_addr, data_length))
-            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, mem_addr, data_length)
+            cycle, mem_addr, data_length = (30, 1<<63, 16)
+            print("Asking to read memory on cycle {} starting on address {} for lenght {}".format(cycle, mem_addr, data_length))
+            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, cycle, mem_addr, data_length)
             print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
 
-            mem_addr, data = (1<<63, bytes.fromhex('aeafacaacaba')) #b'Hello')
-            print("Asking to write memory starting on address {} with data {}".format(mem_addr, data))
-            write_mem_req = make_new_session_write_memory_request(TEST_SESSION_ID, mem_addr, data)
+            cycle, mem_addr, data_length = (0, 1<<63, 16)
+            print("Asking to read memory on cycle {} starting on address {} for lenght {}".format(cycle, mem_addr, data_length))
+            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, cycle, mem_addr, data_length)
+            print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
+
+            cycle, mem_addr, data = (30, 1<<63, bytes.fromhex('aeafacaacaba'))
+            print("Asking to write memory on cycle {} starting on address {} with data {}".format(cycle, mem_addr, data))
+            write_mem_req = make_new_session_write_memory_request(TEST_SESSION_ID, cycle, mem_addr, data)
             print("Server response:\n{}".format(dump_write_mem_response_to_json(stub_high.SessionWriteMemory(write_mem_req))))
 
-            mem_addr, data_length = (1<<63, 16)
-            print("Asking to read memory starting on address {} for lenght {}".format(mem_addr, data_length))
-            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, mem_addr, data_length)
+            cycle, mem_addr, data_length = (30, 1<<63, 16)
+            print("Asking to read memory on cycle {} starting on address {} for lenght {}".format(cycle, mem_addr, data_length))
+            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, cycle, mem_addr, data_length)
+            print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
+
+            cycle, mem_addr, data_length = (0, 1<<63, 16)
+            print("Asking to read memory on cycle {} starting on address {} for lenght {}".format(cycle, mem_addr, data_length))
+            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, cycle, mem_addr, data_length)
+            print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
+
+            cycle, mem_addr, data_length = (30, 1<<63, 16)
+            print("Asking to read memory on cycle {} starting on address {} for lenght {}".format(cycle, mem_addr, data_length))
+            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, cycle, mem_addr, data_length)
+            print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
+
+            cycle, mem_addr, data_length = (30, 1<<63, 16)
+            print("Asking to read memory on cycle {} starting on address {} for lenght {}".format(cycle, mem_addr, data_length))
+            read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, cycle, mem_addr, data_length)
             print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
 
             #Eventually used for debugging: hook a ipython session in this point

@@ -142,10 +142,11 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
 
             session_id = request.session_id
             read_mem_req = request.position
-            LOGGER.info("New session memory read requested for session_id {} on address {} with length {}".format(session_id, read_mem_req.address, read_mem_req.length))
+            cycle = request.cycle
+            LOGGER.info("New session memory read requested for session_id {} on cycle {} for address {} with length {}".format(session_id, cycle, read_mem_req.address, read_mem_req.length))
 
             #Execute and return the session memory read result
-            return self.session_registry_manager.session_read_mem(session_id, read_mem_req)
+            return self.session_registry_manager.session_read_mem(session_id, cycle, read_mem_req)
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
@@ -165,10 +166,11 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
 
             session_id = request.session_id
             write_mem_req = request.position
-            LOGGER.info("New session memory write requested for session_id {} on address {} with data {}".format(session_id, write_mem_req.address, write_mem_req.data))
+            cycle = request.cycle
+            LOGGER.info("New session memory write requested for session_id {} on cycle {} for address {} with data {}".format(session_id, cycle, write_mem_req.address, write_mem_req.data))
 
             #Execute and return the session memory write result
-            return self.session_registry_manager.session_write_mem(session_id, write_mem_req)
+            return self.session_registry_manager.session_write_mem(session_id, cycle, write_mem_req)
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
@@ -188,10 +190,12 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
 
             session_id = request.session_id
             proof_req = request.target
-            LOGGER.info("New session proof requested for session_id {} on address {} with log2_size {}".format(session_id, proof_req.address, proof_req.log2_size))
+            cycle = request.cycle
+
+            LOGGER.info("New session proof requested for session_id {} on cycle {} for address {} with log2_size {}".format(session_id, cycle, proof_req.address, proof_req.log2_size))
 
             #Execute and return the session proof result
-            return self.session_registry_manager.session_get_proof(session_id, proof_req)
+            return self.session_registry_manager.session_get_proof(session_id, cycle, proof_req)
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
