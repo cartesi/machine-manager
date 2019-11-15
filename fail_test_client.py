@@ -16,10 +16,9 @@ from __future__ import print_function
 import grpc
 import sys
 import os
-
-#So the cartesi GRPC modules are in path
-import sys
-sys.path.insert(0,'core/cartesi-grpc/py')
+import traceback
+import argparse
+from IPython import embed
 
 import core_pb2
 import cartesi_base_pb2
@@ -28,9 +27,6 @@ import manager_high_pb2
 import manager_high_pb2_grpc
 import manager_low_pb2
 import manager_low_pb2_grpc
-import traceback
-import argparse
-from IPython import embed
 
 TEST_SESSION_ID = "test_new_session_id"
 START = "start"

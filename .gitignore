@@ -111,3 +111,6 @@ test-files/*
 
 # editor
 .vscode
+
+# Protobuffer generated code
+proto/

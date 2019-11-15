@@ -15,12 +15,13 @@ import subprocess
 import logging
 import logging.config
 import logging.handlers
-import core_pb2_grpc
-import cartesi_base_pb2
-import manager_high_pb2
 import traceback
 import grpc
 import json
+
+import core_pb2_grpc
+import cartesi_base_pb2
+import manager_high_pb2
 
 LOG_FILENAME = "manager.log"
 UNIX = "unix"
