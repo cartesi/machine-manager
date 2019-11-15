@@ -1,0 +1,7 @@
+#!/bin/ash
+
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+MANAGER_DIR=${MANAGER_PATH:-${SCRIPTPATH}}
+export PYTHONPATH=${MANAGER_DIR}/proto
+
+cd ${MANAGER_DIR} && python3 mock_manager_server.py $@
