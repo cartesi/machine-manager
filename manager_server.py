@@ -12,6 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 from concurrent import futures
+from threading import Lock
 import signal
 import time
 import math
@@ -42,10 +43,63 @@ LISTENING_ADDRESS = 'localhost'
 LISTENING_PORT = 50051
 SLEEP_TIME = 5
 
+class NotReadyException(Exception):
+    pass
+
+class SessionJob:
+
+    def __init__(self, session_id):
+        self.id = session_id
+        self.lock = Lock()
+        self.job_hash = None
+        self.job_future = None
+
 class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
 
     def __init__(self, session_registry_manager):
         self.session_registry_manager = session_registry_manager
+        self.global_lock = Lock()
+        self.job = {}
+
+    def __set_job_hash__(self, session_id, request):
+        self.job[session_id].job_hash = request
+
+    def __reset_job__(self, session_id):
+        self.job[session_id].job_future = None
+        self.job[session_id].job_hash = None
+
+    def __try_job__(self, session_id, request, err_msg, fn, *args):
+        LOGGER.debug("Acquiring manager global lock")
+        with self.global_lock:
+            LOGGER.debug("Lock acquired")
+            if session_id in self.job.keys():
+                with self.job[session_id].lock:
+                    if self.job[session_id].job_future is None:
+                        with futures.ThreadPoolExecutor() as executor:
+                            #Submit job and store the future
+                            self.__set_job_hash__(session_id, request)
+                            self.job[session_id].job_future = executor.submit(fn, *args)
+                            raise NotReadyException(err_msg)
+                    elif self.job[session_id].job_future.done():
+                        #Check if the job_hash matches
+                        if request == self.job[session_id].job_hash:
+                            job = self.job[session_id].job_future
+                            self.__reset_job__(session_id)
+                            return job
+                        else:
+                            self.__reset_job__(session_id)
+                            raise NotReadyException(err_msg)
+                    else:
+                        raise NotReadyException(err_msg)
+            else:
+                self.job[session_id] = SessionJob(session_id)
+                with self.job[session_id].lock:
+                    with futures.ThreadPoolExecutor() as executor:
+                        #Submit job and store the future
+                        self.__set_job_hash__(session_id, request)
+                        self.job[session_id].job_future = executor.submit(fn, *args)
+                        raise NotReadyException(err_msg)
+        
 
     def ServerShuttingDown(self, context):
         if self.session_registry_manager.shutting_down:
@@ -63,9 +117,10 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             session_id = request.session_id
             machine_req = request.machine
             LOGGER.info("New session requested with session_id: {}".format(session_id))
-
-            #Create the session and return the initial hash
-            return self.session_registry_manager.new_session(session_id, machine_req)
+            
+            err_msg = "Result is not yet ready for NewSession: " + session_id
+            job = self.__try_job__(session_id, request, err_msg, self.session_registry_manager.new_session, session_id, machine_req)
+            return job.result()
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
@@ -90,8 +145,9 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             #Validate cycle values
             utils.validate_cycles(final_cycles)
 
-            #Execute and return the session run result
-            return self.session_registry_manager.run_session(session_id, final_cycles)
+            err_msg = "Result is not yet ready for SessionRun: " + session_id
+            job = self.__try_job__(session_id, request, err_msg, self.session_registry_manager.run_session, session_id, final_cycles)
+            return job.result()
 
         #No session with provided id, address issue, bad final cycles provided or problem during rollback
         except (SessionIdException, AddressException, utils.CycleException, RollbackException) as e:
@@ -116,8 +172,9 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             #Validate cycle value
             utils.validate_cycles([initial_cycle])
 
-            #Execute and return the session step result
-            return self.session_registry_manager.step_session(session_id, initial_cycle)
+            err_msg = "Result is not yet ready for SessionStep: " + session_id
+            job = self.__try_job__(session_id, request, err_msg, self.session_registry_manager.step_session, session_id, initial_cycle)
+            return job.result()
 
         #No session with provided id, address issue, bad initial cycle provided or problem during rollback
         except (SessionIdException, AddressException, utils.CycleException, RollbackException) as e:
@@ -141,8 +198,9 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             cycle = request.cycle
             LOGGER.info("New session memory read requested for session_id {} on cycle {} for address {} with length {}".format(session_id, cycle, read_mem_req.address, read_mem_req.length))
 
-            #Execute and return the session memory read result
-            return self.session_registry_manager.session_read_mem(session_id, cycle, read_mem_req)
+            err_msg = "Result is not yet ready for SessionReadMemory: " + session_id
+            job = self.__try_job__(session_id, request, err_msg, self.session_registry_manager.session_read_mem, session_id, cycle, read_mem_req)
+            return job.result()
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
@@ -165,8 +223,9 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             cycle = request.cycle
             LOGGER.info("New session memory write requested for session_id {} on cycle {} for address {} with data {}".format(session_id, cycle, write_mem_req.address, write_mem_req.data))
 
-            #Execute and return the session memory write result
-            return self.session_registry_manager.session_write_mem(session_id, cycle, write_mem_req)
+            err_msg = "Result is not yet ready for SessionWriteMemory: " + session_id
+            job = self.__try_job__(session_id, request, err_msg, self.session_registry_manager.session_write_mem, session_id, cycle, write_mem_req)
+            return job.result()
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
@@ -190,8 +249,9 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
 
             LOGGER.info("New session proof requested for session_id {} on cycle {} for address {} with log2_size {}".format(session_id, cycle, proof_req.address, proof_req.log2_size))
 
-            #Execute and return the session proof result
-            return self.session_registry_manager.session_get_proof(session_id, cycle, proof_req)
+            err_msg = "Result is not yet ready for SessionWriteMemory: " + session_id
+            job = self.__try_job__(session_id, request, err_msg, self.session_registry_manager.session_get_proof, session_id, cycle, proof_req)
+            return job.result()
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
