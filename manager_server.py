@@ -57,6 +57,7 @@ class SessionJob:
 class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
 
     def __init__(self, session_registry_manager):
+        self.executor = futures.ThreadPoolExecutor(max_workers=10)
         self.session_registry_manager = session_registry_manager
         self.global_lock = Lock()
         self.job_cache = {}
@@ -68,8 +69,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
         request_hash = pickle.dumps(request)
 
         #Cache the job only if no exception raised
-        if request_hash not in self.job_cache.keys():
-            self.job_cache[request_hash] = future
+        self.job_cache[request_hash] = future
 
         return result
 
@@ -111,10 +111,9 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
                 LOGGER.debug("First SessionJob creation")
                 self.job[session_id] = SessionJob(session_id)
         
-            with futures.ThreadPoolExecutor() as executor:
-                self.__set_job_hash__(session_id, request_hash)
-                self.__set_job_future__(session_id, executor.submit(fn, *args))
-                raise NotReadyException(err_msg)
+            self.__set_job_hash__(session_id, request_hash)
+            self.__set_job_future__(session_id, self.executor.submit(fn, *args))
+            raise NotReadyException(err_msg)
         
 
     def ServerShuttingDown(self, context):
@@ -265,7 +264,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
 
             LOGGER.info("New session proof requested for session_id {} on cycle {} for address {} with log2_size {}".format(session_id, cycle, proof_req.address, proof_req.log2_size))
 
-            err_msg = "Result is not yet ready for SessionWriteMemory: " + session_id
+            err_msg = "Result is not yet ready for SessionGetProof: " + session_id
             job = self.__get_job__(session_id, request, err_msg, self.session_registry_manager.session_get_proof, session_id, cycle, proof_req)
             return self.__set_job_cache__(request, job)
 
