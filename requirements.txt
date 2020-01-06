@@ -1,6 +1,6 @@
-grpcio==1.18.0
-grpcio-reflection==1.18.0
-grpcio-tools==1.18.0
+grpcio==1.26.0
+grpcio-reflection==1.26.0
+grpcio-tools==1.26.0
 protobuf==3.6.1
 python-dateutil==2.7.5
 six==1.12.0
