@@ -1,11 +1,8 @@
 name: Docker
-on:
-  push:
-    branches:
-      - develop
+on: [push]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v1
         with:
@@ -19,11 +16,17 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Machine Manager
-        run: docker build . -t cartesi/machine-manager:latest
-      - name: Push to Docker Hub
-        run: docker push cartesi/machine-manager:latest
-
+        run: docker build . -t cartesi/machine-manager
+      
       - name: Build Mock Server
-        run: docker build . -t cartesi/machine-manager-mock:latest -f DockerfileMock
+        run: docker build . -t cartesi/machine-manager-mock -f DockerfileMock
+
       - name: Push to Docker Hub
-        run: docker push cartesi/machine-manager-mock:latest
+        run: |
+          docker tag cartesi/machine-manager cartesi/machine-manager:${GITHUB_REF:11}
+          docker tag cartesi/machine-manager-mock cartesi/machine-manager-mock:${GITHUB_REF:11}
+          docker push cartesi/machine-manager
+          docker push cartesi/machine-manager:${GITHUB_REF:11}
+          docker push cartesi/machine-manager-mock
+          docker push cartesi/machine-manager-mock:${GITHUB_REF:11}
+        if: startsWith(github.ref, 'refs/tags/v')
