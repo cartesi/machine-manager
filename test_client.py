@@ -21,7 +21,6 @@ import datetime
 import json
 import traceback
 import argparse
-#from IPython import embed
 
 import core_pb2
 import cartesi_base_pb2
@@ -47,7 +46,7 @@ CONTAINER_SERVER = False
 
 TEST_ROM = {
     BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw {} -- /bin/echo nice && ls /mnt",
-    BACKING: "rom-linux.bin"
+    BACKING: "rom.bin"
 }
 
 TEST_RAM = {
@@ -63,7 +62,7 @@ BACKING_TEST_DRIVE_FILEPATH = "rootfs.ext2"
 TEST_DRIVES = [
     {
         START: 1 << 63, #2**63 or ~ 9*10**18
-        LENGTH: 46223360,
+        LENGTH: 62914560,
         BACKING: BACKING_TEST_DRIVE_FILEPATH,
         SHARED: False,
         LABEL: "rootfs"
@@ -196,7 +195,7 @@ def port_number(port):
     return port
 
 def get_args():
-    parser = argparse.ArgumentParser(description='GRPC test client to the machine manager server')
+    parser = argparse.ArgumentParser(description='gRPC test client to the machine manager server')
     parser.add_argument('--address', '-a', dest='address', default=DEFAULT_ADD, help="Machine manager server address")
     parser.add_argument('--port', '-p', type=port_number, dest='port', default=DEFAULT_PORT, help="Machine manager server port")
     parser.add_argument('--container', '-c', action="store_true", dest="container_server", help="Fixes file references for when machine manager server is running from docker container")

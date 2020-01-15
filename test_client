@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+wget -P test-files/ -nc https://github.com/cartesi/image-kernel/releases/download/v0.2.0/kernel.bin
+wget -P test-files/ -nc https://github.com/cartesi/machine-emulator-rom/releases/download/v0.2.0/rom.bin
+wget -P test-files/ -nc https://github.com/cartesi/image-rootfs/releases/download/v0.2.0/rootfs.ext2
+
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+MANAGER_DIR=${MANAGER_PATH:-${SCRIPTPATH}}
+export PYTHONPATH=${MANAGER_DIR}/proto
+
+python3 test_client.py $@
