@@ -58,14 +58,15 @@ TEST_DRIVES = [
 ]
 
 def make_new_session_request():
-    rom_msg = cartesi_base_pb2.ROM(bootargs=TEST_ROM[BOOTARGS])
-    ram_msg = cartesi_base_pb2.RAM(length=TEST_RAM[LENGTH], backing=TEST_RAM[BACKING])
+    rom_msg = cartesi_base_pb2.ROMConfig(bootargs=TEST_ROM[BOOTARGS])
+    ram_msg = cartesi_base_pb2.RAMConfig(length=TEST_RAM[LENGTH], backing=TEST_RAM[BACKING])
     drives_msg = []
     for drive in TEST_DRIVES:
-        drive_msg = cartesi_base_pb2.Drive(start=drive[START], length=drive[LENGTH], backing=drive[BACKING],
+        drive_msg = cartesi_base_pb2.FlashConfig(start=drive[START], length=drive[LENGTH], backing=drive[BACKING],
                                            shared=drive[SHARED], label=drive[LABEL])
         drives_msg.append(drive_msg)
-    machine_msg = cartesi_base_pb2.MachineRequest(rom=rom_msg, ram=ram_msg, flash=drives_msg)
+    machine_config = cartesi_base_pb2.MachineConfig(rom=rom_msg, ram=ram_msg, flash=drives_msg)
+    machine_msg = cartesi_base_pb2.MachineRequest(config=machine_config)
     return manager_high_pb2.NewSessionRequest(session_id=TEST_SESSION_ID, machine=machine_msg)
 
 def address(add):

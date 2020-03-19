@@ -19,7 +19,7 @@ RUN \
 
 # Container final image
 # ----------------------------------------------------
-FROM cartesi/machine-emulator:0.2.0
+FROM cartesi/machine-emulator:0.3.0
 
 LABEL maintainer="Carlo Fragni <carlo@cartesi.io>"
 
