@@ -30,6 +30,8 @@ import manager_high_pb2_grpc
 import manager_low_pb2
 import manager_low_pb2_grpc
 
+from IPython import embed
+
 SLEEP_TIME = 5
 DEFAULT_PORT = 50051
 DEFAULT_ADD = 'localhost'
@@ -40,12 +42,13 @@ BACKING = "backing"
 LENGTH = "length"
 SHARED = "shared"
 BOOTARGS = "bootargs"
+YIELDABLE = "yieldable"
 LABEL = "label"
 
 CONTAINER_SERVER = False
 
 TEST_ROM = {
-    BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw {} -- /bin/echo nice && ls /mnt",
+    BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw {} -- /opt/cartesi/bin/yield-test",
     BACKING: "rom.bin"
 }
 
@@ -69,6 +72,10 @@ TEST_DRIVES = [
     }
 ]
 
+HTIF_CONFIG = {
+    YIELDABLE: True
+}
+
 def build_mtdparts_str(drives):
 
     mtdparts_str = "mtdparts="
@@ -83,7 +90,7 @@ def make_new_session_request():
     if (CONTAINER_SERVER):
         files_dir = CONTAINER_BASE_PATH
 
-    ram_msg = cartesi_base_pb2.RAM(length=TEST_RAM[LENGTH], backing=files_dir + TEST_RAM[BACKING])
+    ram_msg = cartesi_base_pb2.RAMConfig(length=TEST_RAM[LENGTH], backing=files_dir + TEST_RAM[BACKING])
     drives_msg = []
     for drive in TEST_DRIVES:
         drive_msg = cartesi_base_pb2.FlashConfig(start=drive[START], length=drive[LENGTH], backing=files_dir + drive[BACKING],
@@ -91,8 +98,9 @@ def make_new_session_request():
         drives_msg.append(drive_msg)
     bootargs_str = TEST_ROM[BOOTARGS].format(build_mtdparts_str(TEST_DRIVES))
     rom_msg = cartesi_base_pb2.ROMConfig(bootargs=bootargs_str, backing=files_dir + TEST_ROM[BACKING])
+    htif_msg = cartesi_base_pb2.HTIFConfig(yieldable=HTIF_CONFIG[YIELDABLE])
 
-    machine_config = cartesi_base_pb2.MachineConfig(rom=rom_msg, ram=ram_msg, flash=drives_msg)
+    machine_config = cartesi_base_pb2.MachineConfig(rom=rom_msg, ram=ram_msg, flash=drives_msg, htif=htif_msg)
     machine_msg = cartesi_base_pb2.MachineRequest(config=machine_config)
     return manager_high_pb2.NewSessionRequest(session_id=TEST_SESSION_ID, machine=machine_msg)
 
@@ -363,7 +371,7 @@ def run():
             print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
 
             #Eventually used for debugging: hook a ipython session in this point
-            #embed()
+            embed()
 
         except Exception as e:
             print("An exception occurred:")

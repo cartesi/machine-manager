@@ -18,12 +18,17 @@ import logging.handlers
 import traceback
 import grpc
 import json
+import time
+import os
 
 import core_pb2_grpc
 import cartesi_base_pb2
 import manager_high_pb2
 
 LOG_FILENAME = "manager.log"
+
+RUN_CYCLES_BATCH_SIZE = 10**7
+
 UNIX = "unix"
 TCP = "tcp"
 SOCKET_TYPE = UNIX
@@ -62,7 +67,7 @@ def new_cartesi_machine_server(session_id, manager_address):
     LOGGER.debug("Executing {}".format(" ".join(cmd_line)))
     proc = None
     try:
-        proc = subprocess.Popen(cmd_line, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(cmd_line, stderr=subprocess.PIPE, stdout=subprocess.PIPE, env=os.environ)
         out, err = proc.communicate()
         LOGGER.debug("\nStdout:\n{}\nStderr:\n{}".format(out.decode("utf-8"), err.decode("utf-8")))
     except Exception as e:
@@ -119,12 +124,71 @@ def rollback_machine(session_id, address):
         stub.Rollback(cartesi_base_pb2.Void())
         LOGGER.debug("Cartesi machine rolledback for session_id '{}'".format(session_id))
 
-def run_machine(session_id, address, c):
-    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
-    with grpc.insecure_channel(address) as channel:
+def run_machine(session_id, session_context, desired_cycle):
+    ''' This function must be called only when the lock for the given session
+        is held by the caller
+    '''
+    if (desired_cycle < current_cycle):
+        raise ValueError("The given desired_cycle must not be smaller than the current_cycle")
+
+    response = None
+
+    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, session_context.address))
+    with grpc.insecure_channel(session_context.address) as channel:
         stub = core_pb2_grpc.MachineStub(channel)
-        response = stub.Run(cartesi_base_pb2.RunRequest(limit=c))
-        LOGGER.debug("Cartesi machine ran for session_id '{}' and desired final cycle of {}".format(session_id, c))
+
+        #Setting cycle for run batch
+        target_cycle = session_context.cycle + RUN_CYCLES_BATCH_SIZE
+        #If it`s beyond the desired cycle, truncate
+        if (target_cycle > desired_cycle):
+            target_cycle = desired_cycle
+
+        #Run loop
+        while (True):
+            #Run
+            LOGGER.debug("Running cartesi machine for session id {} with target cycle of {}, current cycle is {}".format(session_id, target_cycle, session_context.cycle))
+            response = stub.Run(cartesi_base_pb2.RunRequest(limit=target_cycle))
+
+            #Update tracked cycle and updated_at timestamp in the session context
+            session_context.cycle = response.mcycle
+            session_context.updated_at = time.time()
+
+            LOGGER.debug("Updated cycle of session '{}' to {}".format(session_id, response.mcycle))
+
+            #Checking if machine halted
+            if response.iflags_h:
+                #Storing the halting cycle in session context to use in progress calculations
+                session_context.halt_cycle = session_context.cycle
+                LOGGER.debug("Session {} halted with payload {}".format(session_id, int.from_bytes(response.tohost.to_bytes(8, 'big')[2:], byteorder='big')))
+                break
+            #Checking if the machine yielded
+            elif response.iflags_y:
+                #Parsing tohost to see if a progress command was given
+                #The command is the second byte in the tohost 8bytes register
+                cmd = response.tohost.to_bytes(8, 'big')[1]
+                payload = int.from_bytes(response.tohost.to_bytes(8, 'big')[2:], byteorder='big')
+
+                if (cmd==0):
+                    #It was a progress command, storing the progress
+                    session_context.app_progress = payload
+                    LOGGER.debug("New progress for session {}: {}".format(session_id, payload))
+                else:
+                    #Wasn't a progress command, just logging
+                    LOGGER.debug("Session {} yielded with command {} and payload {}".format(session_id, cmd, payload))
+            else:
+                #The machine reached the target_cycle, setting next one if it wasn't the desired cycle
+                if target_cycle == desired_cycle:
+                    #It was, break the loop
+                    break
+
+                #It wasn't, set the next target cycle
+                target_cycle += RUN_CYCLES_BATCH_SIZE
+
+                #If it`s beyond the desired cycle, truncate
+                if (target_cycle > desired_cycle):
+                    target_cycle = desired_cycle
+
+        LOGGER.debug("Cartesi machine ran for session_id '{}' and desired final cycle of {}, current cycle is {}".format(session_id, desired_cycle, session_context.cycle))
         return response
 
 def step_machine(session_id, address):

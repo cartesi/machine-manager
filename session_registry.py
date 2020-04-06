@@ -361,21 +361,14 @@ class SessionRegistryManager:
         self.create_machine(session_id, self.registry[session_id].creation_machine_req)
 
     def run_and_update_registry_cycle(self, session_id, c):
+        LOGGER.debug("Running session {} up to cycle {}".format(session_id, c))
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
             raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
 
         #Running cartesi machine
-        result = utils.run_machine(session_id, self.registry[session_id].address, c)
-
-        #Updating cartesi session cycle
-        #Acquiring lock to write on session registry
-        with self.global_lock:
-            LOGGER.debug("Session registry global lock acquired")
-            self.registry[session_id].cycle = c
-
-        LOGGER.debug("Updated cycle of session '{}' to {}".format(session_id, self.registry[session_id].cycle))
+        result = utils.run_machine(session_id, self.registry[session_id], c)
 
         return result
 
@@ -432,6 +425,9 @@ class CartesiSession:
         self.cycle = 0
         self.snapshot_cycle = None
         self.creation_machine_req = None
+        self.updated_at = time.time()
+        self.app_progress = 0
+        self.halt_cycle = None
 
 
 
