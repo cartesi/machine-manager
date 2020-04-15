@@ -370,6 +370,8 @@ class SessionRegistryManager:
         #Running cartesi machine
         result = utils.run_machine(session_id, self.registry[session_id], c)
 
+        LOGGER.debug("Executed run of session {} with given target cycle {}".format(session_id, c))
+
         return result
 
     def step_and_update_registry_cycle(self, session_id):

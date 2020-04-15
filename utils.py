@@ -128,9 +128,12 @@ def run_machine(session_id, session_context, desired_cycle):
     ''' This function must be called only when the lock for the given session
         is held by the caller
     '''
+
+    current_cycle = session_context.cycle
+    LOGGER.debug("Current cycle: {}\nDesired cycle: {}".format(current_cycle, desired_cycle))
+
     if (desired_cycle < current_cycle):
         raise ValueError("The given desired_cycle must not be smaller than the current_cycle")
-
     response = None
 
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, session_context.address))
@@ -224,13 +227,13 @@ def get_machine_proof(session_id, address, proof_req):
         return response
 
 def make_session_run_result(summaries, hashes):
-    return manager_high_pb2.SessionRunResult(summaries=summaries, hashes=hashes)
+    return manager_high_pb2.SessionRunResponse(result=manager_high_pb2.SessionRunResult(summaries=summaries, hashes=hashes))
 
 def make_session_step_result(access_log):
-    return manager_high_pb2.SessionStepResult(log=access_log)
+    return manager_high_pb2.SessionStepResponse(log=access_log)
 
 def make_session_read_memory_result(read_mem_resp):
-    return manager_high_pb2.SessionReadMemoryResult(read_content=read_mem_resp)
+    return manager_high_pb2.SessionReadMemoryResponse(read_content=read_mem_resp)
 
 class CycleException(Exception):
     pass
@@ -296,15 +299,29 @@ def dump_step_response_to_file(access_log, open_dump_file):
     open_dump_file.write("\n\n" + '#'*80 + json_dump)
 
 def dump_run_response_to_json(run_resp):
-    resp_dict = {"summaries": [], "hashes": []}
+    resp_dict = None
 
-    for val in run_resp.summaries:
-        resp_dict["summaries"].append({
+    #Checking which of the oneof fields were set
+    oneof_fieldname = run_resp.WhichOneof("run_oneof")
+
+    if oneof_fieldname == "result":
+        resp_dict = {"summaries": [], "hashes": []}
+
+        for val in run_resp.result.summaries:
+            resp_dict["summaries"].append({
                                           'tohost': val.tohost,
                                           'mcycle': val.mcycle
                                       })
-    for val in run_resp.hashes:
-        resp_dict["hashes"].append("0x{}".format(val.content.hex()))
+        for val in run_resp.result.hashes:
+            resp_dict["hashes"].append("0x{}".format(val.content.hex()))
+
+    elif oneof_fieldname == "progress":
+        resp_dict = {
+                "progress": run_resp.progress.progress,
+                "application_progress": run_resp.progress.application_progress,
+                "updated_at": run_resp.progress.updated_at,
+                "cycle": run_resp.progress.cycle
+        }
 
     return json.dumps(resp_dict, indent=4, sort_keys=True)
 

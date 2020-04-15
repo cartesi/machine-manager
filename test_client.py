@@ -32,7 +32,7 @@ import manager_low_pb2_grpc
 
 from IPython import embed
 
-SLEEP_TIME = 5
+SLEEP_TIME = 1
 DEFAULT_PORT = 50051
 DEFAULT_ADD = 'localhost'
 
@@ -42,7 +42,7 @@ BACKING = "backing"
 LENGTH = "length"
 SHARED = "shared"
 BOOTARGS = "bootargs"
-YIELDABLE = "yieldable"
+YIELD = "yield"
 LABEL = "label"
 
 CONTAINER_SERVER = False
@@ -73,7 +73,7 @@ TEST_DRIVES = [
 ]
 
 HTIF_CONFIG = {
-    YIELDABLE: True
+    YIELD: True
 }
 
 def build_mtdparts_str(drives):
@@ -92,13 +92,20 @@ def make_new_session_request():
 
     ram_msg = cartesi_base_pb2.RAMConfig(length=TEST_RAM[LENGTH], backing=files_dir + TEST_RAM[BACKING])
     drives_msg = []
+    print('='*80 + "\nFlash configs:")
     for drive in TEST_DRIVES:
-        drive_msg = cartesi_base_pb2.FlashConfig(start=drive[START], length=drive[LENGTH], backing=files_dir + drive[BACKING],
+        backing_path = files_dir + drive[BACKING]
+        print("New flash config:\nDrive backing: {}\nStart: {}\nLength: {}\nShared: {}".format(backing_path, drive[START], drive[LENGTH], drive[SHARED]))
+        drive_msg = cartesi_base_pb2.FlashConfig(start=drive[START], length=drive[LENGTH], backing=backing_path,
                                            shared=drive[SHARED])
         drives_msg.append(drive_msg)
     bootargs_str = TEST_ROM[BOOTARGS].format(build_mtdparts_str(TEST_DRIVES))
-    rom_msg = cartesi_base_pb2.ROMConfig(bootargs=bootargs_str, backing=files_dir + TEST_ROM[BACKING])
-    htif_msg = cartesi_base_pb2.HTIFConfig(yieldable=HTIF_CONFIG[YIELDABLE])
+    rom_backing = files_dir + TEST_ROM[BACKING]
+    print('='*80 + "\nRom config:\nBootargs: {}\nBacking: {}".format(bootargs_str, rom_backing))
+    rom_msg = cartesi_base_pb2.ROMConfig(bootargs=bootargs_str, backing=rom_backing)
+    print('='*80 + "\nHTIF config:\nYield: {}".format(HTIF_CONFIG[YIELD]))
+    htif_msg = cartesi_base_pb2.HTIFConfig()
+    setattr(htif_msg, "yield", HTIF_CONFIG[YIELD])
 
     machine_config = cartesi_base_pb2.MachineConfig(rom=rom_msg, ram=ram_msg, flash=drives_msg, htif=htif_msg)
     machine_msg = cartesi_base_pb2.MachineRequest(config=machine_config)
@@ -159,15 +166,29 @@ def dump_step_response_to_json(access_log):
     return json.dumps(access_log_dict, indent=4, sort_keys=True)
 
 def dump_run_response_to_json(run_resp):
-    resp_dict = {"summaries": [], "hashes": []}
+    resp_dict = None
 
-    for val in run_resp.summaries:
-        resp_dict["summaries"].append({
+    #Checking which of the oneof fields were set
+    oneof_fieldname = run_resp.WhichOneof("run_oneof")
+
+    if oneof_fieldname == "result":
+        resp_dict = {"summaries": [], "hashes": []}
+
+        for val in run_resp.result.summaries:
+            resp_dict["summaries"].append({
                                           'tohost': val.tohost,
                                           'mcycle': val.mcycle
                                       })
-    for val in run_resp.hashes:
-        resp_dict["hashes"].append("0x{}".format(val.content.hex()))
+        for val in run_resp.result.hashes:
+            resp_dict["hashes"].append("0x{}".format(val.content.hex()))
+
+    elif oneof_fieldname == "progress":
+        resp_dict = {
+                "progress": run_resp.progress.progress,
+                "application_progress": run_resp.progress.application_progress,
+                "updated_at": run_resp.progress.updated_at,
+                "cycle": run_resp.progress.cycle
+        }
 
     return json.dumps(resp_dict, indent=4, sort_keys=True)
 
@@ -193,6 +214,17 @@ def dump_read_mem_response_to_json(read_mem_resp):
 
 def dump_write_mem_response_to_json(write_mem_resp):
     return json.dumps("{}".format(write_mem_resp), indent=4, sort_keys=True)
+
+def run_to_completion(stub, run_req):
+    
+    resp = stub.SessionRun(run_req)
+
+    while (resp.WhichOneof("run_oneof") != "result"):
+        print("Server progress response:\n{}\n".format(dump_run_response_to_json(resp)))
+        time.sleep(SLEEP_TIME)
+        resp = stub.SessionRun(run_req)
+
+    return resp
 
 def port_number(port):
     try:
@@ -238,23 +270,27 @@ def run():
             final_cycles = [0, 15, 30, 45, 60]
             print("Asking to run the machine for {} final cycle(s) ({})".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             #Test run with first final_cycle < machine cycle and first final_cycle > snapshot cycle to force rollback
             final_cycles = [30, 35, 40, 45]
             print("Asking to run the machine for {} final cycles(s) ({}), the 1st final cycle forces a rollback".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             #Test run with first final cycle < machine cycle and first final cycle < snapshot cycle to force recreating machine
             final_cycles = [1, 5, 10]
             print("Asking to run the machine for {} final cycle(s) ({}), the 1st final cycle forces recreating the machine".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             #Test run with first final cycle > machine cycle so no special effort should be needed
             final_cycles = [15]
             print("Asking to run the machine for {} final cycle(s) ({}), no special effort needed".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
-
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
+            #Test a long run
+            final_cycles=[500000000]
+            print("Asking to run the machine for {} final cycle(s) ({}), long run".format(len(final_cycles),final_cycles))
+            run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             #STEP SESSION
             print("\n\n\nSTEP SESSION TESTS\n\n\n")
 
@@ -263,7 +299,7 @@ def run():
             final_cycles = [20,30]
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             initial_cycle = 0
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
@@ -275,7 +311,7 @@ def run():
             final_cycles = [15,30]
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             initial_cycle = 16
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
@@ -287,7 +323,7 @@ def run():
             final_cycles = [20,30]
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             initial_cycle = 1
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
@@ -299,7 +335,7 @@ def run():
             final_cycles = [20,30]
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             initial_cycle = 35
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
@@ -309,9 +345,10 @@ def run():
 
             print("Test step with initial cycle = machine cycle, so step doesn't even have to make a dummy run to get into machine cycle = initial cycle")
             final_cycles = [20,30]
+            sys.exit(0)
             print("Asking to run the machine for {} final cycle(s) ({}), to prepare machine for that scenario".format(len(final_cycles),final_cycles))
             run_req = make_new_session_run_request(TEST_SESSION_ID, final_cycles)
-            print("Server response:\n{}".format(dump_run_response_to_json(stub_high.SessionRun(run_req))))
+            print("Server response:\n{}".format(dump_run_response_to_json(run_to_completion(stub_high, run_req))))
             initial_cycle = 30
             print("Asking to step the machine on initial cycle ({})".format(initial_cycle))
             step_req = make_new_session_step_request(TEST_SESSION_ID, initial_cycle)
@@ -371,7 +408,7 @@ def run():
             print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_high.SessionReadMemory(read_mem_req))))
 
             #Eventually used for debugging: hook a ipython session in this point
-            embed()
+            #embed()
 
         except Exception as e:
             print("An exception occurred:")

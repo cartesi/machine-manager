@@ -64,6 +64,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
         self.job = {}
 
     def __set_job_cache__(self, request, future):
+        LOGGER.debug("Setting job cache")
         result = future.result()
 
         request_hash = pickle.dumps(request)
@@ -164,6 +165,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
 
         #If the session result is not ready yet, return progress
         except NotReadyException as e:
+            LOGGER.debug("Not ready yet, getting progress")
             session_context = self.session_registry_manager.registry[session_id]
 
             #Calculating cycles related progress
@@ -172,14 +174,17 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
                 if last_cycle > session_context.halt_cycle:
                     last_cycle = session_context.halt_cycle
 
-            #Calcuting percentage progress with 2 decimal places
-            cycle_progress = int(session_context.cycle/last_cycle * 10000) / 100
+            cycle_progress = 0
+            #Calcuting percentage progress with 2 decimal places, if machine already in a cycle
+            #that alows it to run to the desired cycle
+            if (session_context.cycle <= last_cycle):
+                cycle_progress = int(int(session_context.cycle/last_cycle * 10000) / 100)
 
             #Build a status object to return
             session_run_progress = manager_high_pb2.SessionRunProgress(
                     progress=cycle_progress,
                     application_progress=session_context.app_progress,
-                    updated_at=session_context.updated_at,
+                    updated_at=int(session_context.updated_at),
                     cycle=session_context.cycle
             )
             return manager_high_pb2.SessionRunResponse(progress=session_run_progress)
