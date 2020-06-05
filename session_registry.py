@@ -124,6 +124,24 @@ class SessionRegistryManager:
         #Returning SessionStepResult
         return step_result
 
+    def session_store(self, session_id, store_req):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+
+        LOGGER.debug("Acquiring lock for session {}".format(session_id))
+
+        store_result = None
+
+        with self.registry[session_id].lock:
+
+            #Request to store the cartesi machine
+            store_result =  utils.store_machine(session_id, self.registry[session_id].address, store_req)
+
+        #Returning CartesiMachine Void
+        return store_result
+
     def session_read_mem(self, session_id, cycle, read_mem_req):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
@@ -173,7 +191,7 @@ class SessionRegistryManager:
         if LOGGER.getEffectiveLevel() <= utils.logging.DEBUG:
             LOGGER.debug(utils.dump_write_mem_response_to_json(write_result))
 
-        #Returning CartesiBase Void
+        #Returning CartesiMachine Void
         return write_result
 
     def session_get_proof(self, session_id, cycle, proof_req):
@@ -200,7 +218,7 @@ class SessionRegistryManager:
         if LOGGER.getEffectiveLevel() <= utils.logging.DEBUG:
             LOGGER.debug(utils.dump_get_proof_response_to_json(proof_result))
 
-        #Returning CartesiBase Proof
+        #Returning CartesiMachine Proof
         return proof_result
 
 

@@ -21,9 +21,9 @@ import json
 import time
 import os
 
-import core_pb2_grpc
-import cartesi_base_pb2
-import manager_high_pb2
+import cartesi_machine_pb2_grpc
+import cartesi_machine_pb2
+import machine_manager_pb2
 
 LOG_FILENAME = "manager.log"
 
@@ -90,38 +90,38 @@ def new_machine(session_id, address, machine_req):
 
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
         response = stub.Machine(machine_req)
         LOGGER.debug("Cartesi machine created for session_id '{}'".format(session_id))
 
 def shutdown_cartesi_machine_server(session_id, address):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
-        response = stub.Shutdown(cartesi_base_pb2.Void())
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
+        response = stub.Shutdown(cartesi_machine_pb2.Void())
         LOGGER.debug("Cartesi machine server shutdown for session_id '{}'".format(session_id))
 
 def get_machine_hash(session_id, address):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
         LOGGER.debug("Asking for cartesi machine root hash for session_id '{}'".format(session_id))
-        response = stub.GetRootHash(cartesi_base_pb2.Void())
+        response = stub.GetRootHash(cartesi_machine_pb2.Void())
         LOGGER.debug("Cartesi machine root hash retrieved for session_id '{}'".format(session_id))
         return response
 
 def create_machine_snapshot(session_id, address):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
-        stub.Snapshot(cartesi_base_pb2.Void())
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
+        stub.Snapshot(cartesi_machine_pb2.Void())
         LOGGER.debug("Cartesi machine snapshot created for session_id '{}'".format(session_id))
 
 def rollback_machine(session_id, address):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
-        stub.Rollback(cartesi_base_pb2.Void())
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
+        stub.Rollback(cartesi_machine_pb2.Void())
         LOGGER.debug("Cartesi machine rolledback for session_id '{}'".format(session_id))
 
 def run_machine(session_id, session_context, desired_cycle):
@@ -138,7 +138,7 @@ def run_machine(session_id, session_context, desired_cycle):
 
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, session_context.address))
     with grpc.insecure_channel(session_context.address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
 
         #Setting cycle for run batch
         target_cycle = session_context.cycle + RUN_CYCLES_BATCH_SIZE
@@ -150,7 +150,7 @@ def run_machine(session_id, session_context, desired_cycle):
         while (True):
             #Run
             LOGGER.debug("Running cartesi machine for session id {} with target cycle of {}, current cycle is {}".format(session_id, target_cycle, session_context.cycle))
-            response = stub.Run(cartesi_base_pb2.RunRequest(limit=target_cycle))
+            response = stub.Run(cartesi_machine_pb2.RunRequest(limit=target_cycle))
 
             #Update tracked cycle and updated_at timestamp in the session context
             session_context.cycle = response.mcycle
@@ -197,15 +197,23 @@ def run_machine(session_id, session_context, desired_cycle):
 def step_machine(session_id, address):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
-        response = stub.Step(cartesi_base_pb2.Void())
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
+        response = stub.Step(cartesi_machine_pb2.Void())
         LOGGER.debug("Cartesi machine step complete for session_id '{}'".format(session_id))
+        return response
+
+def store_machine(session_id, address, store_req):
+    LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
+    with grpc.insecure_channel(address) as channel:
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
+        response = stub.Store(store_req)
+        LOGGER.debug("Stored Cartesi machine for session_id '{}', desired directory '{}'".format(session_id, store_req.directory))
         return response
 
 def read_machine_memory(session_id, address, read_mem_req):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
         response = stub.ReadMemory(read_mem_req)
         LOGGER.debug("Cartesi machine memory read for session_id '{}', desired mem address {} and length {}".format(session_id, read_mem_req.address, read_mem_req.length))
         return response
@@ -213,7 +221,7 @@ def read_machine_memory(session_id, address, read_mem_req):
 def write_machine_memory(session_id, address, write_mem_req):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
         response = stub.WriteMemory(write_mem_req)
         LOGGER.debug("Cartesi machine memory written for session_id '{}', desired mem address {} and data {}".format(session_id, write_mem_req.address, write_mem_req.data))
         return response
@@ -221,19 +229,19 @@ def write_machine_memory(session_id, address, write_mem_req):
 def get_machine_proof(session_id, address, proof_req):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
-        stub = core_pb2_grpc.MachineStub(channel)
+        stub = cartesi_machine_pb2_grpc.MachineStub(channel)
         response = stub.GetProof(proof_req)
         LOGGER.debug("Got Cartesi machine proof for session_id '{}', desired mem address {} and log2_size {}".format(session_id, proof_req.address, proof_req.log2_size))
         return response
 
 def make_session_run_result(summaries, hashes):
-    return manager_high_pb2.SessionRunResponse(result=manager_high_pb2.SessionRunResult(summaries=summaries, hashes=hashes))
+    return machine_manager_pb2.SessionRunResponse(result=machine_manager_pb2.SessionRunResult(summaries=summaries, hashes=hashes))
 
 def make_session_step_result(access_log):
-    return manager_high_pb2.SessionStepResponse(log=access_log)
+    return machine_manager_pb2.SessionStepResponse(log=access_log)
 
 def make_session_read_memory_result(read_mem_resp):
-    return manager_high_pb2.SessionReadMemoryResponse(read_content=read_mem_resp)
+    return machine_manager_pb2.SessionReadMemoryResponse(read_content=read_mem_resp)
 
 class CycleException(Exception):
     pass
@@ -268,7 +276,7 @@ def dump_step_response_to_json(access_log):
         access_log_dict['brackets'].append(
                 {
                     'type':
-                    cartesi_base_pb2._BRACKETNOTE_BRACKETNOTETYPE.values_by_number[bracket.type].name,
+                    cartesi_machine_pb2._BRACKETNOTE_BRACKETNOTETYPE.values_by_number[bracket.type].name,
                     'where': bracket.where,
                     'text' : bracket.text
                 })
@@ -277,7 +285,7 @@ def dump_step_response_to_json(access_log):
         access_dict = {
                     'read': "0x{}".format(access.read.content.hex()),
                     'written' : "0x{}".format(access.written.content.hex()),
-                    'operation' : cartesi_base_pb2._ACCESSOPERATION.values_by_number[access.operation].name,
+                    'operation' : cartesi_machine_pb2._ACCESSOPERATION.values_by_number[access.operation].name,
                     'proof' : {
                             'address': access.proof.address,
                             'log2_size': access.proof.log2_size,

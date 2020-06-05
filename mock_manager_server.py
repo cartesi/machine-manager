@@ -21,11 +21,11 @@ import traceback
 import argparse
 from grpc_reflection.v1alpha import reflection
 
-import manager_low_pb2_grpc
-import manager_low_pb2
-import manager_high_pb2_grpc
-import manager_high_pb2
-import cartesi_base_pb2
+import machine_discovery_pb2_grpc
+import machine_discovery_pb2
+import machine_manager_pb2_grpc
+import machine_manager_pb2
+import cartesi_machine_pb2
 import utils
 from session_registry import SessionIdException, AddressException, RollbackException
 
@@ -43,7 +43,7 @@ LISTENING_PORT = 50051
 SLEEP_TIME = 5
 DEFECTIVE = False
 
-class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
+class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
 
     def __init__(self, session_registry_manager):
         self.session_registry_manager = session_registry_manager
@@ -66,8 +66,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             LOGGER.info("New session requested with session_id: {}".format(session_id))
 
             #Return the fixed initial hash
-            return cartesi_base_pb2.Hash(content=bytes.fromhex("00"))
-            #return self.session_registry_manager.new_session(session_id, machine_req)
+            return cartesi_machine_pb2.Hash(content=bytes.fromhex("00"))
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
@@ -86,13 +85,12 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
                 return
 
             #Return the fixed session run result
-            summaries = [cartesi_base_pb2.RunResponse(), cartesi_base_pb2.RunResponse()]
-            hashes = [cartesi_base_pb2.Hash(content=bytes.fromhex("00")), cartesi_base_pb2.Hash(content=bytes.fromhex("00"))]
+            summaries = [cartesi_machine_pb2.RunResponse(), cartesi_machine_pb2.RunResponse()]
+            hashes = [cartesi_machine_pb2.Hash(content=bytes.fromhex("00")), cartesi_machine_pb2.Hash(content=bytes.fromhex("00"))]
             if DEFECTIVE:
-                hashes = [cartesi_base_pb2.Hash(content=bytes.fromhex("00")), cartesi_base_pb2.Hash(content=bytes.fromhex("01"))]
+                hashes = [cartesi_machine_pb2.Hash(content=bytes.fromhex("00")), cartesi_machine_pb2.Hash(content=bytes.fromhex("01"))]
             run_result = utils.make_session_run_result(summaries, hashes)
             return run_result
-            #return self.session_registry_manager.run_session(session_id, final_cycles)
 
             session_id = request.session_id
             final_cycles = request.final_cycles
@@ -118,15 +116,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
                 return
 
             #Return the empty session step result
-            return manager_high_pb2.SessionStepResult()
-            #return self.session_registry_manager.step_session(session_id, initial_cycle)
-
-            session_id = request.session_id
-            initial_cycle = request.initial_cycle
-            LOGGER.info("New session step requested for session_id {} with initial cycle {}".format(session_id, initial_cycle))
-
-            #Validate cycle value
-            utils.validate_cycles([initial_cycle])
+            return machine_manager_pb2.SessionStepResponse()
 
         #No session with provided id, address issue, bad initial cycle provided or problem during rollback
         except (SessionIdException, AddressException, utils.CycleException, RollbackException) as e:
@@ -139,7 +129,7 @@ class _MachineManagerHigh(manager_high_pb2_grpc.MachineManagerHighServicer):
             context.set_details('An exception with message "{}" was raised!'.format(e))
             context.set_code(grpc.StatusCode.UNKNOWN)
 
-class _MachineManagerLow(manager_low_pb2_grpc.MachineManagerLowServicer):
+class _MachineDiscovery(machine_discovery_pb2_grpc.MachineDiscoveryServicer):
 
     def __init__(self, session_registry_manager):
         self.session_registry_manager = session_registry_manager
@@ -154,7 +144,7 @@ class _MachineManagerLow(manager_low_pb2_grpc.MachineManagerLowServicer):
             self.session_registry_manager.register_address_for_session(session_id, address)
 
             #Returning
-            return cartesi_base_pb2.Void()
+            return cartesi_machine_pb2.Void()
 
         #No session with provided id
         except SessionIdException as e:
@@ -183,14 +173,14 @@ def serve(args):
     manager_address = '{}:{}'.format(listening_add, listening_port)
     session_registry_manager = SessionRegistryManager(manager_address)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    manager_high_pb2_grpc.add_MachineManagerHighServicer_to_server(_MachineManagerHigh(session_registry_manager),
+    machine_manager_pb2_grpc.add_MachineManagerServicer_to_server(_MachineManager(session_registry_manager),
                                                       server)
-    manager_low_pb2_grpc.add_MachineManagerLowServicer_to_server(_MachineManagerLow(session_registry_manager),
+    machine_discovery_pb2_grpc.add_MachineDiscoveryServicer_to_server(_MachineDiscovery(session_registry_manager),
                                                       server)
 
     SERVICE_NAMES = (
-        manager_high_pb2.DESCRIPTOR.services_by_name['MachineManagerHigh'].full_name,
-        manager_low_pb2.DESCRIPTOR.services_by_name['MachineManagerLow'].full_name,
+        machine_manager_pb2.DESCRIPTOR.services_by_name['MachineManager'].full_name,
+        machine_discovery_pb2.DESCRIPTOR.services_by_name['MachineDiscovery'].full_name,
         reflection.SERVICE_NAME,
     )
     reflection.enable_server_reflection(SERVICE_NAMES, server)
@@ -226,7 +216,7 @@ def serve(args):
 if __name__ == '__main__':
 
     #Adding argument parser
-    description = "Instantiates a core manager server, responsible for managing and interacting with multiple cartesi machine instances"
+    description = "Instantiates a mocked machine manager server"
 
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
