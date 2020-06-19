@@ -30,7 +30,7 @@ import machine_manager_pb2_grpc
 import machine_discovery_pb2
 import machine_discovery_pb2_grpc
 
-from IPython import embed
+#from IPython import embed
 
 SLEEP_TIME = 1
 DEFAULT_PORT = 50051
@@ -126,7 +126,9 @@ def make_new_session_run_request(session_id, final_cycles):
     return machine_manager_pb2.SessionRunRequest(session_id=session_id, final_cycles=final_cycles)
 
 def make_new_session_step_request(session_id, initial_cycle):
-    return machine_manager_pb2.SessionStepRequest(session_id=session_id, initial_cycle=initial_cycle)
+    log_type = cartesi_machine_pb2.AccessLogType(proofs=True, annotations=True)
+    step_req = cartesi_machine_pb2.StepRequest(log_type=log_type)
+    return machine_manager_pb2.SessionStepRequest(session_id=session_id, initial_cycle=initial_cycle, step_params=step_req)
 
 def make_new_session_get_proof_request(session_id, cycle, address, log2_size):
     proof_req = cartesi_machine_pb2.GetProofRequest(address=address, log2_size=log2_size)
@@ -281,6 +283,8 @@ def run():
     if os.path.exists(store_dir):
         if os.path.isdir(store_dir):
             print("Moving old store directory to {}".format(store_dir + ".old"))
+            #Removing old dir if exists, ignore_errors set to True not to raise exceptions in case it doesn't
+            shutil.rmtree(store_dir + ".old", ignore_errors=True)
             shutil.move(store_dir, store_dir + ".old")
         else:
             print("The configured directory path for store already exists but it's a file: {}".format(store_dir))

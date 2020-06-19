@@ -194,11 +194,11 @@ def run_machine(session_id, session_context, desired_cycle):
         LOGGER.debug("Cartesi machine ran for session_id '{}' and desired final cycle of {}, current cycle is {}".format(session_id, desired_cycle, session_context.cycle))
         return response
 
-def step_machine(session_id, address):
+def step_machine(session_id, address, step_params):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
         stub = cartesi_machine_pb2_grpc.MachineStub(channel)
-        response = stub.Step(cartesi_machine_pb2.Void())
+        response = stub.Step(step_params)
         LOGGER.debug("Cartesi machine step complete for session_id '{}'".format(session_id))
         return response
 

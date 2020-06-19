@@ -96,7 +96,7 @@ class SessionRegistryManager:
         #Returning SessionRunResult
         return run_result
 
-    def step_session(self, session_id, initial_cycle):
+    def step_session(self, session_id, initial_cycle, step_params):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
@@ -114,7 +114,7 @@ class SessionRegistryManager:
                 self.run_machine_to_desired_cyle(session_id, initial_cycle)
 
             #The machine is in initial_cycle, stepping now
-            step_result =  utils.make_session_step_result(self.step_and_update_registry_cycle(session_id))
+            step_result =  utils.make_session_step_result(self.step_and_update_registry_cycle(session_id, step_params))
 
         #Checking if log level is DEBUG or more detailed since building the
         #debug info is expensive
@@ -392,14 +392,14 @@ class SessionRegistryManager:
 
         return result
 
-    def step_and_update_registry_cycle(self, session_id):
+    def step_and_update_registry_cycle(self, session_id, step_params):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
             raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
 
         #Stepping cartesi machine
-        result = utils.step_machine(session_id, self.registry[session_id].address)
+        result = utils.step_machine(session_id, self.registry[session_id].address, step_params)
 
         #Updating cartesi session cycle
         #Acquiring lock to write on session registry

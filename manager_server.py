@@ -207,12 +207,27 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
 
             session_id = request.session_id
             initial_cycle = request.initial_cycle
-            LOGGER.info("New session step requested for session_id {} with initial cycle {}".format(session_id, initial_cycle))
+            step_params = None
+
+            #Setting step_params if provided
+            if (request.WhichOneof("step_params_oneof") is not None):
+                if (request.WhichOneof("step_params_oneof") == "step_params"):
+                    step_params = request.step_params
+                    LOGGER.info("Step parameters received on request")
+
+            #Setting default step parameters if none were provided
+            if (step_params == None):
+                log_type = cartesi_machine_pb2.AccessLogType(proofs=True, annotations=False)
+                step_params = cartesi_machine_pb2.StepRequest(log_type=log_type)
+                LOGGER.info("Step parameters set to default")
+
+
+            LOGGER.info("New session step requested for session_id {} with initial cycle {}\nLog proofs: {}\nLog annotations: {}".format(session_id, initial_cycle, step_params.log_type.proofs, step_params.log_type.annotations))
 
             #Validate cycle value
             utils.validate_cycles([initial_cycle])
 
-            return self.session_registry_manager.step_session(session_id, initial_cycle)
+            return self.session_registry_manager.step_session(session_id, initial_cycle, step_params)
 
         #No session with provided id, address issue, bad initial cycle provided or problem during rollback
         except (SessionIdException, AddressException, utils.CycleException, RollbackException) as e:
