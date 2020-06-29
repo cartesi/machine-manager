@@ -108,7 +108,7 @@ def get_machine_hash(session_id, address):
         LOGGER.debug("Asking for cartesi machine root hash for session_id '{}'".format(session_id))
         response = stub.GetRootHash(cartesi_machine_pb2.Void())
         LOGGER.debug("Cartesi machine root hash retrieved for session_id '{}'".format(session_id))
-        return response
+        return response.hash
 
 def create_machine_snapshot(session_id, address):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
@@ -200,7 +200,7 @@ def step_machine(session_id, address, step_params):
         stub = cartesi_machine_pb2_grpc.MachineStub(channel)
         response = stub.Step(step_params)
         LOGGER.debug("Cartesi machine step complete for session_id '{}'".format(session_id))
-        return response
+        return response.log
 
 def store_machine(session_id, address, store_req):
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
@@ -283,20 +283,20 @@ def dump_step_response_to_json(access_log):
 
     for access in access_log.log.accesses:
         access_dict = {
-                    'read': "0x{}".format(access.read.content.hex()),
-                    'written' : "0x{}".format(access.written.content.hex()),
+                    'read': "0x{}".format(access.read.data.hex()),
+                    'written' : "0x{}".format(access.written.data.hex()),
                     'operation' : cartesi_machine_pb2._ACCESSOPERATION.values_by_number[access.operation].name,
                     'proof' : {
                             'address': access.proof.address,
                             'log2_size': access.proof.log2_size,
-                            'target_hash': "0x{}".format(access.proof.target_hash.content.hex()),
-                            'root_hash': "0x{}".format(access.proof.root_hash.content.hex()),
+                            'target_hash': "0x{}".format(access.proof.target_hash.data.hex()),
+                            'root_hash': "0x{}".format(access.proof.root_hash.data.hex()),
                             'sibling_hashes' : []
                         }
                 }
 
         for sibling in access.proof.sibling_hashes:
-            access_dict['proof']['sibling_hashes'].append("0x{}".format(sibling.content.hex()))
+            access_dict['proof']['sibling_hashes'].append("0x{}".format(sibling.data.hex()))
 
         access_log_dict['accesses'].append(access_dict)
 
@@ -321,7 +321,7 @@ def dump_run_response_to_json(run_resp):
                                           'mcycle': val.mcycle
                                       })
         for val in run_resp.result.hashes:
-            resp_dict["hashes"].append("0x{}".format(val.content.hex()))
+            resp_dict["hashes"].append("0x{}".format(val.data.hex()))
 
     elif oneof_fieldname == "progress":
         resp_dict = {
@@ -339,16 +339,19 @@ def dump_run_response_to_file(run_resp, open_dump_file):
 
 def dump_get_proof_response_to_json(proof_resp):
 
+    proof = proof_resp.proof
     resp_dict = {
-        'address': proof_resp.address,
-        'log2_size': proof_resp.log2_size,
-        'target_hash': "0x{}".format(proof_resp.target_hash.content.hex()),
-        'root_hash': "0x{}".format(proof_resp.root_hash.content.hex()),
-        'sibling_hashes' : []
+            'proof': {
+                'address': proof.address,
+                'log2_size': proof.log2_size,
+                'target_hash': "0x{}".format(proof.target_hash.data.hex()),
+                'root_hash': "0x{}".format(proof.root_hash.data.hex()),
+                'sibling_hashes' : []
+            }
     }
 
-    for sibling in proof_resp.sibling_hashes:
-        resp_dict['sibling_hashes'].append("0x{}".format(sibling.content.hex()))
+    for sibling in proof.sibling_hashes:
+        resp_dict['proof']['sibling_hashes'].append("0x{}".format(sibling.data.hex()))
 
     return json.dumps(resp_dict, indent=4, sort_keys=True)
 

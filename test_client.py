@@ -55,7 +55,7 @@ TEST_ROM = {
 
 TEST_RAM = {
     LENGTH: 64 << 20, #2**26 or 67108864
-    IMAGE_FILENAME: "kernel.bin"
+    IMAGE_FILENAME: "linux.bin"
 }
 
 CONTAINER_BASE_PATH = "/root/host/"
@@ -166,20 +166,20 @@ def dump_step_response_to_json(access_log):
 
     for access in access_log.log.accesses:
         access_dict = {
-                    'read': "0x{}".format(access.read.content.hex()),
-                    'written' : "0x{}".format(access.written.content.hex()),
+                    'read': "0x{}".format(access.read.data.hex()),
+                    'written' : "0x{}".format(access.written.data.hex()),
                     'operation' : cartesi_machine_pb2._ACCESSOPERATION.values_by_number[access.operation].name,
                     'proof' : {
                             'address': access.proof.address,
                             'log2_size': access.proof.log2_size,
-                            'target_hash': "0x{}".format(access.proof.target_hash.content.hex()),
-                            'root_hash': "0x{}".format(access.proof.root_hash.content.hex()),
+                            'target_hash': "0x{}".format(access.proof.target_hash.data.hex()),
+                            'root_hash': "0x{}".format(access.proof.root_hash.data.hex()),
                             'sibling_hashes' : []
                         }
                 }
 
         for sibling in access.proof.sibling_hashes:
-            access_dict['proof']['sibling_hashes'].append("0x{}".format(sibling.content.hex()))
+            access_dict['proof']['sibling_hashes'].append("0x{}".format(sibling.data.hex()))
 
         access_log_dict['accesses'].append(access_dict)
 
@@ -200,7 +200,7 @@ def dump_run_response_to_json(run_resp):
                                           'mcycle': val.mcycle
                                       })
         for val in run_resp.result.hashes:
-            resp_dict["hashes"].append("0x{}".format(val.content.hex()))
+            resp_dict["hashes"].append("0x{}".format(val.data.hex()))
 
     elif oneof_fieldname == "progress":
         resp_dict = {
@@ -217,13 +217,13 @@ def dump_proof_to_json(proof):
     proof_dict = {
         'address': proof.address,
         'log2_size': proof.log2_size,
-        'target_hash': "0x{}".format(proof.target_hash.content.hex()),
-        'root_hash': "0x{}".format(proof.root_hash.content.hex()),
+        'target_hash': "0x{}".format(proof.target_hash.data.hex()),
+        'root_hash': "0x{}".format(proof.root_hash.data.hex()),
         'sibling_hashes' : []
     }
 
     for sibling in proof.sibling_hashes:
-        proof_dict['sibling_hashes'].append("0x{}".format(sibling.content.hex()))
+        proof_dict['sibling_hashes'].append("0x{}".format(sibling.data.hex()))
 
     return json.dumps(proof_dict, indent=4, sort_keys=True)
 
@@ -273,12 +273,9 @@ def get_args():
 def run():
     responses = []
     srv_add, srv_port = get_args()
-    
+
     #Rename the previous store directory if any to the same name + .old
-    store_dir_base = NATIVE_BASE_PATH
-    if (CONTAINER_SERVER):
-        store_dir_base = CONTAINER_BASE_PATH
-    store_dir = store_dir_base + STORE_DIRECTORY
+    store_dir = NATIVE_BASE_PATH  + STORE_DIRECTORY
 
     if os.path.exists(store_dir):
         if os.path.isdir(store_dir):
@@ -301,7 +298,7 @@ def run():
 
             #Test new session
             print("Asking to create a new session")
-            print("Server response:\n{}".format(stub_machine_man.NewSession(make_new_session_request()).content.hex()))
+            print("Server response:\n{}".format(stub_machine_man.NewSession(make_new_session_request()).data.hex()))
 
             #RUN SESSION
             print("\n\n\nRUN SESSION TESTS\n\n\n")
@@ -416,7 +413,7 @@ def run():
             print("Server response:\n{}".format(dump_store_response_to_json(stub_machine_man.SessionStore(store_req))))
 
             print("Asking to create a new session from previous store")
-            print("Server response:\n{}".format(stub_machine_man.NewSession(make_new_session_from_store_request(TEST_SESSION_ID_2, STORE_DIRECTORY)).content.hex()))
+            print("Server response:\n{}".format(stub_machine_man.NewSession(make_new_session_from_store_request(TEST_SESSION_ID_2, STORE_DIRECTORY)).data.hex()))
 
             final_cycles = [60]
             print("Asking to run the new machine for {} final cycle(s) ({})".format(len(final_cycles),final_cycles))

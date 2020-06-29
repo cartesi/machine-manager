@@ -309,7 +309,7 @@ class SessionRegistryManager:
 
         LOGGER.debug("Issuing server to get machine root hash for session '{}'".format(session_id))
         root_hash = utils.get_machine_hash(session_id, self.registry[session_id].address)
-        LOGGER.debug("Executed getting machine root hash for session '{}': 0x{}".format(session_id, root_hash.content.hex()))
+        LOGGER.debug("Executed getting machine root hash for session '{}': 0x{}".format(session_id, root_hash.data.hex()))
         return root_hash
 
     def snapshot_machine(self, session_id):
