@@ -98,8 +98,8 @@ def make_new_session_request():
     print('='*80 + "\nFlash configs:")
     for drive in TEST_DRIVES:
         image_filename_path = files_dir + drive[IMAGE_FILENAME]
-        print("New flash config:\nDrive image_filename: {}\nStart: {}\nLength: {}\nShared: {}".format(image_filename_path, drive[START], drive[LENGTH], drive[SHARED]))
-        drive_msg = cartesi_machine_pb2.FlashConfig(start=drive[START], length=drive[LENGTH], image_filename=image_filename_path,
+        print("New flash_drive config:\nDrive image_filename: {}\nStart: {}\nLength: {}\nShared: {}".format(image_filename_path, drive[START], drive[LENGTH], drive[SHARED]))
+        drive_msg = cartesi_machine_pb2.FlashDriveConfig(start=drive[START], length=drive[LENGTH], image_filename=image_filename_path,
                                            shared=drive[SHARED])
         drives_msg.append(drive_msg)
     bootargs_str = TEST_ROM[BOOTARGS].format(build_mtdparts_str(TEST_DRIVES))
@@ -110,7 +110,7 @@ def make_new_session_request():
     htif_msg = cartesi_machine_pb2.HTIFConfig()
     setattr(htif_msg, "yield_progress", HTIF_CONFIG[YIELD])
 
-    machine_config = cartesi_machine_pb2.MachineConfig(rom=rom_msg, ram=ram_msg, flash=drives_msg, htif=htif_msg)
+    machine_config = cartesi_machine_pb2.MachineConfig(rom=rom_msg, ram=ram_msg, flash_drive=drives_msg, htif=htif_msg)
     machine_msg = cartesi_machine_pb2.MachineRequest(config=machine_config)
     return machine_manager_pb2.NewSessionRequest(session_id=TEST_SESSION_ID, machine=machine_msg)
 

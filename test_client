@@ -2,9 +2,9 @@
 
 set -e
 
-wget -P test-files/ -nc https://github.com/cartesi/image-kernel/releases/download/v0.2.0/kernel.bin
-wget -P test-files/ -nc https://github.com/cartesi/machine-emulator-rom/releases/download/v0.2.0/rom.bin
-wget -P test-files/ -nc https://github.com/cartesi/image-rootfs/releases/download/v0.2.0/rootfs.ext2
+wget -P test-files/ -nc https://github.com/cartesi/image-kernel/releases/download/v0.5.0/linux-5.5.19-ctsi-1.bin
+wget -P test-files/ -nc https://github.com/cartesi/machine-emulator-rom/releases/download/v0.2.1/rom.bin
+wget -P test-files/ -nc https://github.com/cartesi/image-rootfs/releases/download/v0.4.0/rootfs.ext2
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 MANAGER_DIR=${MANAGER_PATH:-${SCRIPTPATH}}
