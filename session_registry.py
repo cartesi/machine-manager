@@ -219,7 +219,7 @@ class SessionRegistryManager:
             LOGGER.debug(utils.dump_get_proof_response_to_json(proof_result))
 
         #Returning CartesiMachine Proof
-        return proof_result
+        return proof_result.proof
 
 
     """
