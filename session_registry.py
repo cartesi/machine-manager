@@ -37,9 +37,21 @@ class SessionRegistryManager:
         self.shutting_down = False
         self.manager_address = manager_address;
 
-    def new_session(self, session_id, machine_req):
+    def new_session(self, session_id, machine_req, force=False):
+
+        #Checking if force is enabled
+        if (force):
+            LOGGER.debug("Force is enabled for creating new session with id {}".format(session_id))
+            #Checking if there is already a session with the given id
+            if (session_id in self.registry.keys()):
+                #Shutting down old server if any
+                if (self.registry[session_id].address):
+                    LOGGER.debug("Shutting down current cartesi machine server for session {}".format(session_id))
+                    utils.shutdown_cartesi_machine_server(session_id, self.registry[session_id].address)
+                    LOGGER.debug("Cartesi machine server for session {} was shut".format(session_id))
+
         #Registering new session
-        self.register_session(session_id)
+        self.register_session(session_id, force)
 
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
@@ -229,12 +241,12 @@ class SessionRegistryManager:
 
 
 
-    def register_session(self, session_id):
+    def register_session(self, session_id, force=False):
         #Acquiring global lock and releasing it when completed
         LOGGER.debug("Acquiring session registry global lock")
         with self.global_lock:
             LOGGER.debug("Lock acquired")
-            if session_id in self.registry.keys():
+            if ((session_id in self.registry.keys()) and force == False):
                 #Session id already in use
                 err_msg = "Trying to register a session with a session_id that already exists: {}".format(session_id)
                 LOGGER.error(err_msg)

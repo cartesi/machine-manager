@@ -88,7 +88,7 @@ def build_mtdparts_str(drives):
 
     return mtdparts_str
 
-def make_new_session_request():
+def make_new_session_request(force=False):
     files_dir = NATIVE_BASE_PATH
     if (CONTAINER_SERVER):
         files_dir = CONTAINER_BASE_PATH
@@ -112,7 +112,7 @@ def make_new_session_request():
 
     machine_config = cartesi_machine_pb2.MachineConfig(rom=rom_msg, ram=ram_msg, flash_drive=drives_msg, htif=htif_msg)
     machine_msg = cartesi_machine_pb2.MachineRequest(config=machine_config)
-    return machine_manager_pb2.NewSessionRequest(session_id=TEST_SESSION_ID, machine=machine_msg)
+    return machine_manager_pb2.NewSessionRequest(session_id=TEST_SESSION_ID, machine=machine_msg, force=force)
 
 def make_new_session_from_store_request(session_id, directory):
     base_load_dir = NATIVE_BASE_PATH
@@ -300,6 +300,9 @@ def run():
             print("Asking to create a new session")
             print("Server response:\n{}".format(stub_machine_man.NewSession(make_new_session_request()).data.hex()))
 
+            print("\nAsking to force create a new session with the same id as the previous one")
+            print("Server response:\n{}".format(stub_machine_man.NewSession(make_new_session_request(force=True)).data.hex()))
+
             #RUN SESSION
             print("\n\n\nRUN SESSION TESTS\n\n\n")
 
@@ -455,6 +458,10 @@ def run():
             print("Asking to read memory on cycle {} starting on address {} for lenght {}".format(cycle, mem_addr, data_length))
             read_mem_req = make_new_session_read_memory_request(TEST_SESSION_ID, cycle, mem_addr, data_length)
             print("Server response:\n{}".format(dump_read_mem_response_to_json(stub_machine_man.SessionReadMemory(read_mem_req))))
+
+            #Recreating the session once more
+            print("Asking to force create a new session with the same id as the previous one")
+            print("Server response:\n{}".format(stub_machine_man.NewSession(make_new_session_request(force=True)).data.hex()))
 
             #Eventually used for debugging: hook a ipython session in this point
             #embed()

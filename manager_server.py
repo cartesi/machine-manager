@@ -132,9 +132,11 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
 
             session_id = request.session_id
             machine_req = request.machine
+            force = request.force
+
             LOGGER.info("New session requested with session_id: {}".format(session_id))
 
-            return self.session_registry_manager.new_session(session_id, machine_req)
+            return self.session_registry_manager.new_session(session_id, machine_req, force)
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
