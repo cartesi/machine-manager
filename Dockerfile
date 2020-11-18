@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 as build-image
+FROM ubuntu:20.04 as build-image
 
 # Install python and other dependencies
 RUN apt-get update && apt-get install -y python3 python3-pip
