@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 as build-image
+FROM ubuntu:20.04 as build-image
 
 # Install python and other dependencies
 RUN apt-get update && apt-get install -y python3 python3-pip
@@ -14,12 +14,12 @@ RUN \
     && cd /root/grpc-interfaces \
     && python3 -m grpc_tools.protoc -I. \
         --python_out=./out --grpc_python_out=./out \
-        cartesi-machine.proto machine-discovery.proto machine-manager.proto \
+        cartesi-machine.proto machine-manager.proto \
         versioning.proto
 
 # Container final image
 # ----------------------------------------------------
-FROM cartesi/machine-emulator:0.5.1
+FROM cartesi/machine-emulator:0.7.0-preview
 
 LABEL maintainer="Carlo Fragni <carlo@cartesi.io>"
 

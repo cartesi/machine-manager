@@ -31,11 +31,11 @@ class RollbackException(Exception):
 
 class SessionRegistryManager:
 
-    def __init__(self, manager_address):
+    def __init__(self):
         self.global_lock = Lock()
         self.registry = {}
         self.shutting_down = False
-        self.manager_address = manager_address;
+        self.next_port = 5000
 
     def new_session(self, session_id, machine_req, force=False):
 
@@ -256,21 +256,6 @@ class SessionRegistryManager:
                 self.registry[session_id] = CartesiSession(session_id)
                 LOGGER.info("New session registered: {}".format(session_id))
 
-    def wait_for_session_address_communication(self, session_id):
-        if (session_id not in self.registry.keys()):
-            raise SessionIdException("No session in registry with provided session_id '{}'".format(session_id))
-
-        LOGGER.debug("Waiting for session address communication for session_id '{}'".format(session_id))
-        self.registry[session_id].address_set_event.wait()
-        LOGGER.debug("Address for session_id '{}' communicated: {}".format(session_id, self.registry[session_id].address))
-        LOGGER.debug("Acquiring session registry global lock")
-        #Acquiring lock to write on session registry
-        with self.global_lock:
-            LOGGER.debug("Session registry global lock acquired")
-            LOGGER.debug("Cleaning address set event")
-            self.registry[session_id].address_set_event.clear()
-            LOGGER.debug("Address set event cleaned")
-
     def register_address_for_session(self, session_id, address):
 
         if (session_id not in self.registry.keys()):
@@ -280,9 +265,8 @@ class SessionRegistryManager:
         #Acquiring lock to write on session registry
         with self.global_lock:
             LOGGER.debug("Session registry global lock acquired")
-            #Registering address and notifying that it was set
+            #Registering address
             self.registry[session_id].address = address
-            self.registry[session_id].address_set_event.set()
             LOGGER.debug("Address for session '{}' set to {}".format(session_id, address))
 
     def create_new_cartesi_machine_server(self, session_id):
@@ -290,13 +274,22 @@ class SessionRegistryManager:
             raise SessionIdException("No session in registry with provided session_id '{}'".format(session_id))
         if (self.registry[session_id].address):
             raise AddressException("Address already set for server with session_id '{}'".format(session_id))
+        
+        server_address = ""
+        LOGGER.debug("Acquiring session registry global lock")
+        #Acquiring lock to increment next_port on session registry
+        with self.global_lock:
+            server_address = "127.0.0.1:{}".format(self.next_port)
+            self.next_port += 1
 
         LOGGER.debug("Creating new cartesi machine server for session_id '{}'".format(session_id))
-        utils.new_cartesi_machine_server(session_id, self.manager_address)
+        utils.new_cartesi_machine_server(session_id, server_address)
         LOGGER.debug("Server created for session '{}'".format(session_id))
 
+        self.register_address_for_session(session_id, server_address)
+
         #Wait for the new server to communicate it's listening address
-        self.wait_for_session_address_communication(session_id)
+        utils.wait_for_server_availability(session_id, server_address)
 
     def create_machine(self, session_id, machine_req):
         if (session_id not in self.registry.keys()):
@@ -340,9 +333,6 @@ class SessionRegistryManager:
             self.registry[session_id].snapshot_cycle = self.registry[session_id].cycle
             LOGGER.debug("Updated snapshot cycle of session '{}' to {}".format(session_id, self.registry[session_id].cycle))
 
-        #Wait for the new server to communicate it's listening address
-        self.wait_for_session_address_communication(session_id)
-
     def rollback_machine(self, session_id):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
@@ -361,9 +351,6 @@ class SessionRegistryManager:
             self.registry[session_id].cycle = self.registry[session_id].snapshot_cycle
             self.registry[session_id].snapshot_cycle = None
             LOGGER.debug("Updated cycle of session '{}' to {} and cleared snapshot cycle".format(session_id, self.registry[session_id].cycle))
-
-        #Wait for the new server to communicate it's listening address
-        self.wait_for_session_address_communication(session_id)
 
     def recreate_machine(self, session_id):
         if (session_id not in self.registry.keys()):
@@ -460,7 +447,3 @@ class CartesiSession:
         self.updated_at = time.time()
         self.app_progress = 0
         self.halt_cycle = None
-
-
-
-

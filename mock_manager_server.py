@@ -21,8 +21,6 @@ import traceback
 import argparse
 from grpc_reflection.v1alpha import reflection
 
-import machine_discovery_pb2_grpc
-import machine_discovery_pb2
 import machine_manager_pb2_grpc
 import machine_manager_pb2
 import cartesi_machine_pb2
@@ -129,34 +127,6 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             context.set_details('An exception with message "{}" was raised!'.format(e))
             context.set_code(grpc.StatusCode.UNKNOWN)
 
-class _MachineDiscovery(machine_discovery_pb2_grpc.MachineDiscoveryServicer):
-
-    def __init__(self, session_registry_manager):
-        self.session_registry_manager = session_registry_manager
-
-    def CommunicateAddress (self, request, context):
-        try:
-            address = request.address
-            session_id = request.session_id
-
-            LOGGER.info("Received a CommunicateAddress request for session_id {} and address {}".format(session_id, address))
-
-            self.session_registry_manager.register_address_for_session(session_id, address)
-
-            #Returning
-            return cartesi_machine_pb2.Void()
-
-        #No session with provided id
-        except SessionIdException as e:
-            LOGGER.error(e)
-            context.set_details("{}".format(e))
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-        #Generic error catch
-        except Exception as e:
-            LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
-            context.set_details('An exception with message "{}" was raised!'.format(e))
-            context.set_code(grpc.StatusCode.UNKNOWN)
-
 def serve(args):
     listening_add = args.address
     listening_port = args.port
@@ -171,16 +141,13 @@ def serve(args):
         from session_registry import SessionRegistryManager
 
     manager_address = '{}:{}'.format(listening_add, listening_port)
-    session_registry_manager = SessionRegistryManager(manager_address)
+    session_registry_manager = SessionRegistryManager()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     machine_manager_pb2_grpc.add_MachineManagerServicer_to_server(_MachineManager(session_registry_manager),
                                                       server)
-    machine_discovery_pb2_grpc.add_MachineDiscoveryServicer_to_server(_MachineDiscovery(session_registry_manager),
-                                                      server)
-
+    
     SERVICE_NAMES = (
         machine_manager_pb2.DESCRIPTOR.services_by_name['MachineManager'].full_name,
-        machine_discovery_pb2.DESCRIPTOR.services_by_name['MachineDiscovery'].full_name,
         reflection.SERVICE_NAME,
     )
     reflection.enable_server_reflection(SERVICE_NAMES, server)

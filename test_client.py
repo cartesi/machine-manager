@@ -27,8 +27,6 @@ import cartesi_machine_pb2
 import cartesi_machine_pb2_grpc
 import machine_manager_pb2
 import machine_manager_pb2_grpc
-import machine_discovery_pb2
-import machine_discovery_pb2_grpc
 
 #from IPython import embed
 
@@ -49,7 +47,7 @@ LABEL = "label"
 CONTAINER_SERVER = False
 
 TEST_ROM = {
-    BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw {} -- /opt/cartesi/bin/yield-test",
+    BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw {} -- for i in $(seq 0 5 1000); do yield progress $i; done",
     IMAGE_FILENAME: "rom.bin"
 }
 
@@ -150,7 +148,10 @@ def make_new_session_write_memory_request(session_id, cycle, mem_addr, data):
     return machine_manager_pb2.SessionWriteMemoryRequest(session_id=session_id, cycle=cycle, position=write_mem_req)
 
 def dump_step_response_to_json(access_log):
-    access_log_dict = {'accesses':[], 'notes':[], 'brackets':[]}
+    access_log_dict = {'log_type': {}, 'accesses':[], 'notes':[], 'brackets':[]}
+
+    access_log_dict['log_type']['proofs'] = access_log.log.log_type.proofs
+    access_log_dict['log_type']['annotations'] = access_log.log.log_type.annotations
 
     for note in access_log.log.notes:
         access_log_dict['notes'].append(note)
@@ -166,12 +167,14 @@ def dump_step_response_to_json(access_log):
 
     for access in access_log.log.accesses:
         access_dict = {
-                    'read': "0x{}".format(access.read.data.hex()),
-                    'written' : "0x{}".format(access.written.data.hex()),
-                    'operation' : cartesi_machine_pb2._ACCESSOPERATION.values_by_number[access.operation].name,
+                    'read': "0x{}".format(access.read.hex()),
+                    'written' : "0x{}".format(access.written.hex()),
+                    'address': access.address,
+                    'log2_size': access.log2_size,
+                    'operation' : cartesi_machine_pb2._ACCESSTYPE.values_by_number[access.type].name,
                     'proof' : {
-                            'address': access.proof.address,
-                            'log2_size': access.proof.log2_size,
+                            'address': access.address,
+                            'log2_size': access.log2_size,
                             'target_hash': "0x{}".format(access.proof.target_hash.data.hex()),
                             'root_hash': "0x{}".format(access.proof.root_hash.data.hex()),
                             'sibling_hashes' : []
@@ -290,7 +293,6 @@ def run():
     conn_str = "{}:{}".format(srv_add, srv_port)
     print("Connecting to server in " + conn_str)
     with grpc.insecure_channel(conn_str) as channel:
-        stub_machine_disc = machine_discovery_pb2_grpc.MachineDiscoveryStub(channel)
         stub_machine_man = machine_manager_pb2_grpc.MachineManagerStub(channel)
         try:
             #NEW SESSION

@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM cartesi/machine-emulator:0.7.0-preview
 
 MAINTAINER Diego Nehab <diego@cartesi.io>
 
