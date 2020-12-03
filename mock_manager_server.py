@@ -64,7 +64,7 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             LOGGER.info("New session requested with session_id: {}".format(session_id))
 
             #Return the fixed initial hash
-            return cartesi_machine_pb2.Hash(content=bytes.fromhex("00"))
+            return cartesi_machine_pb2.Hash(data=bytes.fromhex("00"))
 
         #No session with provided id or address issue
         except (SessionIdException, AddressException) as e:
@@ -84,18 +84,11 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
 
             #Return the fixed session run result
             summaries = [cartesi_machine_pb2.RunResponse(), cartesi_machine_pb2.RunResponse()]
-            hashes = [cartesi_machine_pb2.Hash(content=bytes.fromhex("00")), cartesi_machine_pb2.Hash(content=bytes.fromhex("00"))]
+            hashes = [cartesi_machine_pb2.Hash(data=bytes.fromhex("00")), cartesi_machine_pb2.Hash(data=bytes.fromhex("00"))]
             if DEFECTIVE:
-                hashes = [cartesi_machine_pb2.Hash(content=bytes.fromhex("00")), cartesi_machine_pb2.Hash(content=bytes.fromhex("01"))]
+                hashes = [cartesi_machine_pb2.Hash(data=bytes.fromhex("00")), cartesi_machine_pb2.Hash(data=bytes.fromhex("01"))]
             run_result = utils.make_session_run_result(summaries, hashes)
             return run_result
-
-            session_id = request.session_id
-            final_cycles = request.final_cycles
-            LOGGER.info("New session run requested for session_id {} with final cycles {}".format(session_id, final_cycles))
-
-            #Validate cycle values
-            utils.validate_cycles(final_cycles)
 
         #No session with provided id, address issue, bad final cycles provided or problem during rollback
         except (SessionIdException, AddressException, utils.CycleException, RollbackException) as e:
@@ -145,7 +138,7 @@ def serve(args):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     machine_manager_pb2_grpc.add_MachineManagerServicer_to_server(_MachineManager(session_registry_manager),
                                                       server)
-    
+
     SERVICE_NAMES = (
         machine_manager_pb2.DESCRIPTOR.services_by_name['MachineManager'].full_name,
         reflection.SERVICE_NAME,
