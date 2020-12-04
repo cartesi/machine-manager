@@ -472,6 +472,7 @@ def run():
             print("An exception occurred:")
             print(e)
             print(type(e))
+            sys.exit(1)
 
 if __name__ == '__main__':
     start = time.time()
