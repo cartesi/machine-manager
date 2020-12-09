@@ -1,4 +1,4 @@
-FROM cartesi/machine-emulator:0.7.0-preview
+FROM cartesi/machine-emulator:0.7.0
 
 MAINTAINER Diego Nehab <diego@cartesi.io>
 
