@@ -252,7 +252,7 @@ def wait_for_server_availability(session_id, address):
                 LOGGER.warning("Cartesi machine server for session_id '{}' is not yet ready".format(session_id))
                 retry += 1
                 time.sleep(SLEEP_TIME)
-        
+
         if retry == MAX_CONNECTION_ATTEMPTS:
             err_msg = "Cartesi machine server for session_id '{}' reached max connection attempts {}".format(session_id, MAX_CONNECTION_ATTEMPTS)
             LOGGER.error(err_msg)

@@ -88,6 +88,8 @@ jobs:
       - name: Run Tests
         run: |
           docker run --rm --name cartesi_mm_container -p 50051:50051 -v $(pwd)/test-files:/root/host cartesi/machine-manager:test & timeout 20 bash -c 'while ! nc -q0 127.0.0.1 50051 < /dev/null > /dev/null 2>&1; do sleep 1; done' && ./test-client -c && echo "tests succeeded" && docker kill cartesi_mm_container
+          docker run --rm --name cartesi_mm_container -p 50051:50051 -v $(pwd)/test-files:/root/host cartesi/machine-manager:test /opt/cartesi/bin/machine-manager -a 0.0.0.0 -d & timeout 20 bash -c 'while ! nc -q0 127.0.0.1 50051 < /dev/null > /dev/null 2>&1; do sleep 1; done' && ./test-client -c && echo "tests succeeded" && docker kill cartesi_mm_container
+
 
       - name: Docker meta
         id: docker_meta

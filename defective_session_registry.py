@@ -37,14 +37,14 @@ class SessionRegistryManager(session_registry.SessionRegistryManager):
         session_run_result = super().run_session(session_id, modified_cycles)
 
         #Modify response to mask that the requested cycles were saturated on MAX_CYCLE
-        for i,summary in enumerate(session_run_result.summaries):
+        for i,summary in enumerate(session_run_result.result.summaries):
             summary.mcycle=int(final_cycles[i])
 
         LOGGER.debug("Finished executing defective run for session '{}'\nDesired cycles: {}\nUsed cycles: {}".format(session_id, final_cycles, modified_cycles))
 
         return session_run_result
 
-    def step_session(self, session_id, initial_cycle):
+    def step_session(self, session_id, initial_cycle, step_params):
 
         #Modifying cycle to saturate on MAX_CYCLE - 1
         modified_cycle = int(initial_cycle)
@@ -55,7 +55,7 @@ class SessionRegistryManager(session_registry.SessionRegistryManager):
         LOGGER.debug("Executing defective step for session '{}'\nDesired cycle: {}\nUsed cycle: {}".format(session_id, initial_cycle, modified_cycle))
 
         #Running and returning as response doesn't contain cycle numbers that need to be reset to mask defect
-        session_step_result = super().step_session(session_id, modified_cycle)
+        session_step_result = super().step_session(session_id, modified_cycle, step_params)
 
         LOGGER.debug("Finished executing defective step for session '{}'\nDesired cycle: {}\nUsed cycle: {}".format(session_id, initial_cycle, modified_cycle))
 
