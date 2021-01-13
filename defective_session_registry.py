@@ -41,16 +41,20 @@ class SessionRegistryManager(session_registry.SessionRegistryManager):
             summary.mcycle=int(final_cycles[i])
 
         LOGGER.debug("Finished executing defective run for session '{}'\nDesired cycles: {}\nUsed cycles: {}".format(session_id, final_cycles, modified_cycles))
+        #Checking if log level is DEBUG or more detailed since building the
+        #debug info is expensive
+        if LOGGER.getEffectiveLevel() <= utils.logging.DEBUG:
+            LOGGER.debug("Final response is:\n{}".format(utils.dump_run_response_to_json(session_run_result)))
 
         return session_run_result
 
     def step_session(self, session_id, initial_cycle, step_params):
 
-        #Modifying cycle to saturate on MAX_CYCLE - 1
+        #Modifying cycle to saturate initial cycle on MAX_CYCLE
         modified_cycle = int(initial_cycle)
 
-        if (modified_cycle >= MAX_CYCLE):
-            modified_cycle = MAX_CYCLE - 1
+        if (modified_cycle > MAX_CYCLE):
+            modified_cycle = MAX_CYCLE
 
         LOGGER.debug("Executing defective step for session '{}'\nDesired cycle: {}\nUsed cycle: {}".format(session_id, initial_cycle, modified_cycle))
 
