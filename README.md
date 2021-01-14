@@ -32,6 +32,11 @@ Build machine manager Docker image:
 % docker build . -t cartesi/machine-manager
 ```
 
+Download the test image files:
+```console
+%./download-test-files
+```
+
 Execute a Docker container of the image just built, it will automatically start the machine manager server listening on port 50051:
 ```console
 % docker run -p 50051:50051 -v $(pwd)/test-files:/root/host cartesi/machine-manager
