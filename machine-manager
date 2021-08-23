@@ -1,7 +1,0 @@
-#!/bin/bash
-
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-MANAGER_DIR=${MANAGER_PATH:-${SCRIPTPATH}}
-export PYTHONPATH=${PYTHON_INSTALL}:${MANAGER_DIR}/proto:${MANAGER_DIR}/src
-
-cd ${MANAGER_DIR} && python3 manager.py $@

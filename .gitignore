@@ -114,3 +114,8 @@ test-files/*
 
 # Protobuffer generated code
 proto/
+
+
+# Added by cargo
+
+/target

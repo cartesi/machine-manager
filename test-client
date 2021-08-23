@@ -1,9 +1,0 @@
-#!/bin/sh
-
-set -e
-
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-MANAGER_DIR=${MANAGER_PATH:-${SCRIPTPATH}}
-export PYTHONPATH=${MANAGER_DIR}/proto
-
-python3 test_client.py $@
