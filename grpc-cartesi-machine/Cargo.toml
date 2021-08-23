@@ -1,0 +1,38 @@
+[package]
+name = "grpc-cartesi-machine"
+version = "0.1.0"
+authors = ["Marko Atanasievski <marko.atanasievski@cartesi.io>"]
+edition = "2018"
+
+
+[lib]
+name = "grpc_cartesi_machine"
+path = "src/lib.rs"
+
+[[bin]]
+name = "grpc-cartesi-machine-test"
+path = "src/test_client.rs"
+
+[dependencies]
+cartesi-grpc-interfaces = { path = "../cartesi-grpc-interfaces" }
+tonic = "0.5"
+prost = "0.8"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"]}
+rstest = "0.11.0"
+async-std = { version = "1.5", features = ["attributes"] }
+rand = "0.8.4"
+
+
+[build-dependencies]
+tonic-build = "0.5"
+
+[dev-dependencies]
+async-mutex = "1.4.0"
+
+
+
+
+
+
+
+

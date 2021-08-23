@@ -1,0 +1,21 @@
+[package]
+name = "demo-machine-manager-client"
+version = "0.1.0"
+authors = ["Marko Atanasievski <marko.atanasievski@cartesi.io>"]
+edition = "2018"
+
+
+[[bin]]
+name = "demo-machine-manager-client"
+path = "src/main.rs"
+
+[dependencies]
+cartesi-grpc-interfaces = { path = "../../cartesi-grpc-interfaces" }
+tonic = "0.5"
+prost = "0.8"
+async-trait = "0.1.42"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"]}
+
+
+[build-dependencies]
+tonic-build = "0.5"

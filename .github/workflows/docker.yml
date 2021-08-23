@@ -8,6 +8,7 @@ env:
   KERNEL_FILE: linux-5.5.19-ctsi-3.bin
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -15,75 +16,14 @@ jobs:
           submodules: recursive
           token: ${{ secrets.CI_TOKEN }}
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y build-essential curl libboost-filesystem-dev libreadline-dev libboost-context-dev libboost-coroutine-dev libboost-serialization-dev libboost-filesystem-dev libssl-dev libc-ares-dev zlib1g-dev ca-certificates patchelf automake cmake liblua5.3-dev lua-socket
-          pip3 install -r requirements.txt
-          curl https://sh.rustup.rs -sSf | bash -s -- -y
-          echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
-
-      - name: Download [machine-emulator]
-        uses: Legion2/download-release-action@v2.1.0
+      - name: Setup docker image tags
+        id: docker_image_tags
+        uses: docker/metadata-action@v3
         with:
-          repository: ${{ github.repository_owner }}/machine-emulator
-          tag: v${{ env.EMULATOR_VERSION }}
-          file: machine-emulator-Linux-v${{ env.EMULATOR_VERSION }}.tar.gz
-          token: ${{ secrets.CI_TOKEN }}
-
-      - name: Download [rootfs.ext2]
-        uses: Legion2/download-release-action@v2.1.0
-        with:
-          repository: ${{ github.repository_owner }}/image-rootfs
-          tag: ${{ env.ROOTFS_VERSION }}
-          file: rootfs.ext2
-          token: ${{ secrets.CI_TOKEN }}
-
-      - name: Download [kernel.bin]
-        uses: Legion2/download-release-action@v2.1.0
-        with:
-          repository: ${{ github.repository_owner }}/image-kernel
-          tag: ${{ env.KERNEL_VERSION }}
-          file: ${{ env.KERNEL_FILE }}
-          token: ${{ secrets.CI_TOKEN }}
-
-      - name: Download [rom.bin]
-        uses: Legion2/download-release-action@v2.1.0
-        with:
-          repository: ${{ github.repository_owner }}/machine-emulator-rom
-          tag: ${{ env.ROM_VERSION }}
-          file: rom.bin
-          token: ${{ secrets.CI_TOKEN }}
-
-      - name: Install emulator and images to /opt/cartesi directory
-        run: |
-          mkdir -p /opt/cartesi/share/images
-          tar -xzf machine-emulator-Linux-v${{ env.EMULATOR_VERSION }}.tar.gz -C /opt/cartesi
-          mv rom.bin rootfs.ext2 ${{env.KERNEL_FILE}} /opt/cartesi/share/images
-          ln -s /opt/cartesi/share/images/${{ env.KERNEL_FILE }} /opt/cartesi/share/images/linux.bin
-
-      - name: Generate grpc python code
-        run: |
-          ./generate-cartesi-gprc
-
-      - name: Install machine manager
-        run: |
-          ./install.sh
-
-      - name: Execute Machine Manager Tests
-        run: |
-          export CARTESI_BIN_PATH=/opt/cartesi/bin
-          export CARTESI_IMAGE_PATH=/opt/cartesi/share/images
-          cd tests/rust-test-client && cargo test --release
-
-  build-docker-image:
-    runs-on: ubuntu-20.04
-    needs: [build]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: recursive
-          token: ${{ secrets.CI_TOKEN }}
+          images: ${{ secrets.DOCKER_ORGANIZATION }}/machine-manager
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
 
       - name: Set up Docker Buildx
         id: buildx
@@ -103,54 +43,128 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Setup docker image tags
-        id: docker_image_tags
-        uses: docker/metadata-action@v3
-        with:
-          images: ${{ secrets.DOCKER_ORGANIZATION }}/machine-manager
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-
-      - name: Set test image tag name
-        id: docker_test_image_tag
-        run: echo ::set-output name=name::$(echo "${{ steps.docker_image_tags.outputs.tags }}" | head -n 1 | xargs)
-
-      - name: Build test docker image
-        id: docker_build_test
-        uses: docker/build-push-action@v2
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          context: .
-          push: false
-          load: true
-          tags: ${{ steps.docker_test_image_tag.outputs.name }}
-          cache-from: type=local,src=/tmp/.ubuntu-buildx-cache
-          cache-to: type=local,dest=/tmp/.ubuntu-buildx-cache
-          build-args: |
-            EMULATOR_REPOSITORY=${{ secrets.DOCKER_ORGANIZATION }}/machine-emulator
-            EMULATOR_VERSION=${{ env.EMULATOR_VERSION }}
-
-      - name: Test docker image
-        run: |
-          docker pull fullstorydev/grpcurl:v1.8.5
-          docker run --network=host --name cartesi_mm_container -t ${{ steps.docker_test_image_tag.outputs.name }} &
-          timeout 20 bash -c 'while ! nc -q0 127.0.0.1 50051 < /dev/null > /dev/null 2>&1; do sleep 1; done'
-          docker run --network=host fullstorydev/grpcurl -plaintext 127.0.0.1:50051 list
-          docker kill cartesi_mm_container
-
-      - name: Build and push docker image
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/develop') }}
+#TODO ALSO PUSH IMAGE TO DOCKERHUB
+      - name: Build Rust Machine Manager docker image
         id: docker_build
         uses: docker/build-push-action@v2
         with:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
-          push: true
-          load: false
           tags: ${{ steps.docker_image_tags.outputs.tags }}
+          push: false
+          load: true
           cache-from: type=local,src=/tmp/.ubuntu-buildx-cache
           cache-to: type=local,dest=/tmp/.ubuntu-buildx-cache
-          build-args: |
-            EMULATOR_REPOSITORY=${{ secrets.DOCKER_ORGANIZATION }}/machine-emulator
-            EMULATOR_VERSION=${{ env.EMULATOR_VERSION }}
+
+
+  test:
+    name: Test
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          token: ${{ secrets.CI_TOKEN }}
+
+      - name: Set up Docker Buildx
+        id: buildx2
+        uses: docker/setup-buildx-action@v1
+
+      - name: Docker meta for machine emulator image
+        id: docker_meta_emulator_build
+        uses: crazy-max/ghaction-docker-meta@v1
+        with:
+          images: ${{ secrets.DOCKER_ORGANIZATION }}/machine-emulator
+          tag-custom: |
+            test
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Install Ubuntu dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y build-essential curl libboost-filesystem-dev libreadline-dev libboost-context-dev libboost-coroutine-dev libboost-serialization-dev libboost-filesystem-dev libssl-dev libc-ares-dev zlib1g-dev ca-certificates patchelf automake cmake clang-tidy-12 clang-format-12 liblua5.3-dev lua-socket
+          curl https://sh.rustup.rs -sSf | bash -s -- -y
+          echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+
+      - name: Build machine emulator image
+        id: docker_build_machine_emulator
+        uses: docker/build-push-action@v2
+        with:
+          file: .github/workflows/Dockerfile
+          builder: ${{ steps.buildx2.outputs.name }}
+          context: .
+          push: false
+          load: true
+          tags: ${{ steps.docker_meta_emulator_build.outputs.tags }}
+          secrets: |
+            GIT_AUTH_TOKEN=${{ secrets.CI_TOKEN }}
+
+      - name: Download emulator binary files
+        run: |
+          mkdir -p /opt
+          docker run --rm -v /opt:/opt/destination:rw -t ${{ secrets.DOCKER_ORGANIZATION }}/machine-emulator:${{ env.EMULATOR_VERSION }} /bin/cp -vr /opt/cartesi /opt/destination/
+
+      - name: Set current git organization env var
+        id: git_org
+        run: echo "::set-output name=current_organization::$(echo ${GITHUB_REPOSITORY} | cut -d '/' -f 1)"
+
+      - name: Download [rootfs.ext2]
+        uses: Legion2/download-release-action@v2.1.0
+        with:
+          repository: ${{ steps.git_org.outputs.current_organization }}/image-rootfs
+          tag: ${{ env.ROOTFS_VERSION }}
+          file: rootfs.ext2
+          token: ${{ secrets.CI_TOKEN }}
+
+      - name: Download [kernel.bin]
+        uses: Legion2/download-release-action@v2.1.0
+        with:
+          repository: ${{ steps.git_org.outputs.current_organization }}/image-kernel
+          tag: ${{ env.KERNEL_VERSION }}
+          file: ${{ env.KERNEL_FILE }}
+          token: ${{ secrets.CI_TOKEN }}
+
+      - name: Download [rom.bin]
+        uses: Legion2/download-release-action@v2.1.0
+        with:
+          repository: ${{ steps.git_org.outputs.current_organization }}/machine-emulator-rom
+          tag: ${{ env.ROM_VERSION }}
+          file: rom.bin
+          token: ${{ secrets.CI_TOKEN }}
+#
+      - name: Move images to /opt/cartesi/share/images directory
+        run: |
+          sudo chmod a+rwx -R /opt/cartesi
+          mv rom.bin rootfs.ext2 /opt/cartesi/share/images
+          mv ${{ env.KERNEL_FILE }} /opt/cartesi/share/images/linux.bin
+          sha256sum /opt/cartesi/share/images/linux.bin
+          sha256sum /opt/cartesi/share/images/rom.bin
+          sha256sum /opt/cartesi/share/images/rootfs.ext2
+          sha256sum /opt/cartesi/bin/remote-cartesi-machine
+
+      - name: Build grpc stub dependencies
+        run: |
+          cd cartesi-grpc-interfaces && cargo build --release
+
+      - name: Build Cartesi emulator machine grpc client
+        run: |
+          cd grpc-cartesi-machine && cargo build --release
+
+      - name: Run unit tests for Cartesi emulator machine grpc client
+        run: |
+          cd grpc-cartesi-machine && cargo test --release -- --test-threads=1
+
+      - name: Build Machine Manager Service
+        run: |
+          cd machine-manager-server && cargo build --release && cargo install --force --path . --root /opt/cartesi
+
+      - name: Execute Machine Manager Tests
+        run: |
+          export CARTESI_BIN_PATH=/opt/cartesi/bin
+          export CARTESI_IMAGE_PATH=/opt/cartesi/share/images
+          cd tests/rust-test-client && cargo test --release

@@ -4,7 +4,12 @@
 
 ## Introduction
 
-This repository contains the server responsible for managing different sessions of Cartesi Machines. It has a submodule dependency, the gRPC interface definitions repository, which contains all the interfaces for the communication between this higher level manager and the emulator server.
+This repository contains the server responsible for managing different sessions of Cartesi Machines. It has a submodule dependency, the gRPC interface definitions repository, which contains all the interfaces for the communication between this higher level manager and the cartesi machine emulator server. Repository contains three creates:
+
+- `cartesi-grpc-interfaces` is Rust grpc interface stub for Cartesi emulator and Machine Manager
+- `grpc-cartesi-machine` is Cartesi emulator machine grpc client (depends on `cartesi-grpc-interfaces`)
+- `machine-manager-server` is Rust implementation of the Cartesi machine manager service (depends on `cartesi-grpc-interfaces` and `grpc-cartesi-machine`)
+
 
 The easiest way of running the machine manager server + emulator and test them with a sample workload is through a docker container. To get started, follow [TL;DR;](#tldr)
 
@@ -14,109 +19,125 @@ You may also want to install all the dependencies in your system to compile the 
 
 ### Requirements
 
-- Python >= 3.6
-- Python modules described in the requirements.txt file
+- Rust >= 1.51
+- Docker
 - [Machine Emulator](https://github.com/cartesi/machine-emulator)
+
+#### Installing Rust dependencies
+```console
+% apt update && apt upgrade
+% curl https://sh.rustup.rs -sSf | sh
+```
 
 ## TL;DR;
 
-Once you have docker installed in your machine, checkout this repository with all submodules:
+Once you have docker and Rust installed in your machine, checkout this repository with all submodules:
 ```console
 $ git clone --recurse-submodules git@github.com:cartesi/machine-manager.git
 ```
 
-The machine emulator has pre-built Docker images published at [Docker Hub](https://hub.docker.com/repository/docker/cartesi/machine-emulator). That will be used as the base image for the machine manager image.
+The machine emulator has pre-built Docker images published at [Docker Hub](https://hub.docker.com/repository/docker/cartesi/machine-emulator). Latest version will be used as the base image for the machine manager image.
 
-Build machine manager Docker image:
-```console
-% docker build . -t cartesi/machine-manager
-```
+> :warning: latest version of Cartesi machine server that uses check in mechanism is not
+> yet released on public Cartesi repository, it needs to be generated locally from [cartesi-corp/machine-emulator](https://github.com/cartesi-corp/machine-emulator) develop branch
+> Dockerfile uses cartesicorp/machine-emulator:develop image to build machine manager image
+
 
 Download the test image files:
+> :warning: some image files are not yet released and are only available in the Cartesi corp repositories
 ```console
-%./download-test-files
+$ cd machine-manager
+$ ./tests/download-test-images.sh
+$ export CARTESI_IMAGE_PATH=`pwd`/test-files
 ```
 
-Execute a Docker container of the image just built, it will automatically start the machine manager server listening on port 50051 and check-in server listening on port 50052:
+Build machine manager Rust Docker image:
 ```console
-% docker run -p 50051:50051 -p 50052:50052 -v $(pwd)/test-files:/root/host cartesi/machine-manager
+$ docker build . -t cartesi/machine-manager-rust
 ```
 
-After this step, you should be welcomed by a log message stating that the servers are up and listening on port 50051 and 50052:
+Execute a Docker container of the image just built, it will automatically start the machine manager server listening on port 50051:
 ```console
-% INFO __main__ 338 - serve: Checkin service started, listening on address 0.0.0.0:50052
-% INFO __main__ 338 - serve: Server started, listening on address 0.0.0.0:50051
+$ docker run -p 50051:50051 -v $(pwd)/test-files:/opt/cartesi/share/images cartesi/machine-manager-rust 
 ```
 
-Open another terminal to start another session on the ephemeral docker container and execute the test client:
+After this step, you should be welcomed by a log message stating that the server is up and listening on port 50051:
 ```console
-% ./generate-cartesi-gprc
-% ./test_client -c
+Starting check in service on address 0.0.0.0:50052
+Starting machine manager service on address 0.0.0.0:50051
+```
+
+To test Machine Manager server open another terminal session on host computer and demo client:
+> :warning: TODO IMPLMENT demo-machine-manager-client
+```console
+$ cd tests/demo-machine-manager-client
+$ cargo run
 ```
 You should see the logs on both the server and client terminals showing the steps of the tests being performed by the test client
 
-## Installing dependencies to compile the emulator natively
+### Run Cartesi Machine Manager tests in Docker
+
+Build and run machine-manager-rust-test image
+```console
+$ docker build . -t cartesi/machine-manager-rust-test -f tests/rust-test-client/Dockerfile
+$ docker run -v $(pwd)/test-files:/opt/cartesi/share/images cartesi/machine-manager-rust-test
+```
+
+## Build from source code
+
+### Installing dependencies to compile the emulator natively
 
 Please follow the instructions from the [machine emulator repository](https://github.com/cartesi/machine-emulator/blob/master/README.md)
 
-## Installing python dependencies to execute the machine manager server natively
+### Build 
 
-It is highly advisable to make a separate python environment to install the dependencies for executing the machine manager server. A very popular option to do that is using virtualenv with virtualenvwrapper, on Ubuntu you can install them by executing:
+Build `cartesi-grpc-interfaces` from [Cartesi gRPC Interfaces](https://github.com/cartesi/grpc-interfaces) Protobuf definitions:
+
 ```console
-% sudo apt install virtualenvwrapper
+$ cd cartesi-grpc-interfaces
+$ cargo build
 ```
 
-Install python3 in case you don't already have it
+Build Cartesi machine client:
 ```console
-% sudo apt install python3
+$ cd grpc-cartesi-machine
+$ cargo build
 ```
 
-And then create a new virtual env (named "mm" in the example) that uses python3:
+Build Machine Manager server:
 ```console
-% mkvirtualenv -p `which python3` mm
+$ cd machine-manager-server
+$ cargo build
 ```
 
-And now you may install the python dependencies from the requirements file in your virtual env:
-```console
-$ pip install -r requirements.txt
-```
+### Run Machine Manager service
 
-## Executing the machine manager server
+Specify console environment variables that point to the Cartesi images folder and Cartesi machine server.
+```console
+$ export CARTESI_IMAGE_PATH=`pwd`/test-files
+$ export CARTESI_BIN_PATH=<path to folder with cartesi-machine-server>
+```
 
 To start the server listening on localhost and port 50051, just execute it:
 ```console
-$ ./machine-manager
+$ cd cartesi-machine-server
+$ cargo run --
 ```
 
 The server has a couple of options to customize it's behavior, you can check them using the -h option:
 ```console
-./machine-manager -h
-usage: ./machine-manager [-h] [--address ADDRESS] [--port PORT] [--checkin PORT] [--defective]
+$ cargo run -- -h
+Usage: target/debug/machine-manager [-h] [--address ADDRESS] [--port PORT]
+CARTESI_BIN_PATH and CARTESI_IMAGE_PATH environment variables must be set prior to running
 
-Instantiates a machine manager server, responsible for managing and interacting
-with multiple cartesi machine instances
+Options:
+        --address       Address to listen (default: localhost)
+    -p, --port          Port to listen (default: 50051)
+        --port-checkin  Port to listen for cartesi server manager checkin
+                        (default: 50052)
+    -h, --help          show this help message and exit
 
-optional arguments:
-  -h, --help               show this help message and exit
-  --address ADDRESS, -a    ADDRESS
-                           Address to listen (default: localhost)
-  --port PORT, -p PORT     Port to listen (default: 50051)
-  --checkin PORT, -c PORT  Checkin service port (default: 50052)
-  --defective, -d          Makes server behave improperly, injecting errors
-                           silently in the issued commands
-                           -----------------------WARNING!-----------------------
-                           FOR TESTING PURPOSES ONLY!!!
-                           ------------------------------------------------------
 ```
-
-As stated in the help, do not use -d option in production as it will make the server misbehave silently, a useful feature only for testing purposes.
-
-## Executing the test client
-
-You may want to test machine manager is working correctly using the included test client. To execute it do the following:
-- `export CARTESI_IMAGE_PATH=/path/to/cartesi/machine/images`
-- `export CARTESI_BIN_PATH=/path/to/cartesi/binary/files` (the bin directory should also include machine manager itself)
-- `cd tests/rust-test-client && cargo test`
 
 ## Contributing
 
@@ -126,6 +147,10 @@ Please note we have a [Code of Conduct](CODE_OF_CONDUCT.md), please follow it in
 
 ## Authors
 
+### Rust Machine Manager
+- *Marko Atanasievski*
+
+### Python Machine Manager
 - *Carlo Fragni*
 
 ## License
@@ -133,6 +158,3 @@ Please note we have a [Code of Conduct](CODE_OF_CONDUCT.md), please follow it in
 The machine-manager repository and all contributions are licensed under
 [APACHE 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please review our [LICENSE](LICENSE) file.
 
-## Acknowledgments
-
-- Original work
