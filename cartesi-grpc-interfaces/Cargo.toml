@@ -1,0 +1,17 @@
+[package]
+name = "cartesi-grpc-interfaces"
+version = "0.1.0"
+authors = ["Marko Atanasievski <marko.atanasievski@cartesi.io>"]
+edition = "2018"
+
+[dependencies]
+tonic = "0.5"
+prost = "0.8"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+
+
+[build-dependencies]
+tonic-build = "0.5"
+
+
+

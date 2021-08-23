@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+"grpc-cartesi-machine",
+"cartesi-grpc-interfaces",
+"machine-manager-server",
+"tests/rust-test-client",
+"tests/demo-machine-manager-client"
+]
+
