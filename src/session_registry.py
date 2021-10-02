@@ -11,14 +11,15 @@ CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
 
-from threading import Lock, Event
-import utils
+from threading import Lock, Condition
+import subprocess
 import time
+import utils
 
-WAIT_SERVER_TIME = 2
 
 LOGGER = utils.get_new_logger(__name__)
 LOGGER = utils.configure_log(LOGGER)
+CHECKIN_WAIT_TIMEOUT_SECONDS = 5.0
 
 class AddressException(Exception):
     pass
@@ -29,13 +30,44 @@ class SessionIdException(Exception):
 class RollbackException(Exception):
     pass
 
+class CheckinException(Exception):
+    pass
+
+class SessionKillException(Exception):
+    pass
+
 class SessionRegistryManager:
 
-    def __init__(self):
+    def __init__(self, server_address, checkin_address):
         self.global_lock = Lock()
         self.registry = {}
         self.shutting_down = False
-        self.next_port = 5000
+        self.server_address = server_address
+        self.checkin_address = checkin_address
+
+    def _wait_for_checkin(self, session_id, error_msg):
+        if not self.registry[session_id].checkin_cond.wait(CHECKIN_WAIT_TIMEOUT_SECONDS):
+            self._remove_session(session_id)
+            raise CheckinException(error_msg)
+
+    def _remove_session(self, session_id):
+        LOGGER.debug("Acquiring session registry global lock")
+        with self.global_lock:
+            LOGGER.debug("Lock acquired")
+            self.kill_session(session_id)
+            LOGGER.debug("Removing session '{}' from registry".format(session_id))
+            del self.registry[session_id]
+            LOGGER.debug("Session '{}' removed from registry".format(session_id))
+
+    def kill_session(self, session_id):
+        LOGGER.debug("Killing cartesi machine servers for session `{}`".format(session_id))
+        cmd_line = ["pkill", "-f", "remote-cartesi-machine.*{}".format(session_id)]
+        try:
+            proc = subprocess.Popen(cmd_line)
+            proc.wait()
+        except Exception as e:
+            err_msg = "Unable to kill cartesi machine servers for session `{}`: {}".format(session_id, e)
+            raise SessionKillException(err_msg)
 
     def new_session(self, session_id, machine_req, force=False):
 
@@ -56,7 +88,7 @@ class SessionRegistryManager:
         LOGGER.debug("Acquiring lock for session {}".format(session_id))
         with self.registry[session_id].lock:
             #Instantiate new cartesi machine server
-            self.create_new_cartesi_machine_server(session_id)
+            self.create_new_cartesi_machine_server(session_id, self.server_address, self.checkin_address)
 
             #Communication received, create new cartesi machine
             self.create_machine(session_id, machine_req)
@@ -239,8 +271,6 @@ class SessionRegistryManager:
     """
 
 
-
-
     def register_session(self, session_id, force=False):
         #Acquiring global lock and releasing it when completed
         LOGGER.debug("Acquiring session registry global lock")
@@ -269,27 +299,22 @@ class SessionRegistryManager:
             self.registry[session_id].address = address
             LOGGER.debug("Address for session '{}' set to {}".format(session_id, address))
 
-    def create_new_cartesi_machine_server(self, session_id):
+    def create_new_cartesi_machine_server(self, session_id, server_address, checkin_address):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id '{}'".format(session_id))
         if (self.registry[session_id].address):
             raise AddressException("Address already set for server with session_id '{}'".format(session_id))
-        
-        server_address = ""
-        LOGGER.debug("Acquiring session registry global lock")
-        #Acquiring lock to increment next_port on session registry
-        with self.global_lock:
-            server_address = "127.0.0.1:{}".format(self.next_port)
-            self.next_port += 1
 
-        LOGGER.debug("Creating new cartesi machine server for session_id '{}'".format(session_id))
-        utils.new_cartesi_machine_server(session_id, server_address)
-        LOGGER.debug("Server created for session '{}'".format(session_id))
-
-        self.register_address_for_session(session_id, server_address)
-
-        #Wait for the new server to communicate it's listening address
-        utils.wait_for_server_availability(session_id, server_address)
+        with self.registry[session_id].checkin_lock:
+            LOGGER.debug("Creating new cartesi machine server for session_id '{}'".format(session_id))
+            utils.new_cartesi_machine_server(session_id, server_address, checkin_address)
+            self.registry[session_id].address = None
+            error_msg = "Unable to create machine server for session '{}': no checkin request from new machine".format(session_id)
+            while True:
+                self._wait_for_checkin(session_id, error_msg)
+                if self.registry[session_id].address:
+                    LOGGER.debug("Server created for session '{}'".format(session_id))
+                    break
 
     def create_machine(self, session_id, machine_req):
         if (session_id not in self.registry.keys()):
@@ -321,36 +346,55 @@ class SessionRegistryManager:
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
-            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly"
+                    .format(session_id))
 
-        LOGGER.debug("Issuing server to create machine snapshot for session '{}'".format(session_id))
-        utils.create_machine_snapshot(session_id, self.registry[session_id].address)
-        LOGGER.debug("Executed creating machine snapshot for session '{}'".format(session_id))
-        LOGGER.debug("Acquiring session registry global lock")
-        #Acquiring lock to write on session registry
-        with self.global_lock:
-            LOGGER.debug("Session registry global lock acquired")
-            self.registry[session_id].snapshot_cycle = self.registry[session_id].cycle
-            LOGGER.debug("Updated snapshot cycle of session '{}' to {}".format(session_id, self.registry[session_id].cycle))
+        with self.registry[session_id].checkin_lock:
+            LOGGER.debug("Issuing server to create machine snapshot for session '{}'".format(session_id))
+            utils.create_machine_snapshot(session_id, self.registry[session_id].address)
+            self.registry[session_id].address = None
+            error_msg = "Unable to snapshot machine for session '{}': no checkin request from new machine".format(session_id)
+            while True:
+                self._wait_for_checkin(session_id, error_msg)
+                if self.registry[session_id].address:
+                    LOGGER.debug("Executed creating machine snapshot for session '{}'".format(session_id))
+                    LOGGER.debug("Acquiring session registry global lock")
+                    #Acquiring lock to write on session registry
+                    with self.global_lock:
+                        LOGGER.debug("Session registry global lock acquired")
+                        self.registry[session_id].snapshot_cycle = self.registry[session_id].cycle
+                        LOGGER.debug("Updated snapshot cycle of session '{}' to {}"
+                                .format(session_id, self.registry[session_id].cycle))
+                    break
 
     def rollback_machine(self, session_id):
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
         if (not self.registry[session_id].address):
-            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly"
+                    .format(session_id))
         if (self.registry[session_id].snapshot_cycle == None):
-            raise RollbackException("There is no snapshot to rollback to for the cartesi machine with session_id '{}'".format(session_id))
+            raise RollbackException("There is no snapshot to rollback to for the cartesi machine with session_id '{}'"
+                    .format(session_id))
 
-        LOGGER.debug("Issuing server to rollback machine for session '{}'".format(session_id))
-        utils.rollback_machine(session_id, self.registry[session_id].address)
-        LOGGER.debug("Executed rollingback machine for session '{}'".format(session_id))
-        LOGGER.debug("Acquiring session registry global lock")
-        #Acquiring lock to write on session registry
-        with self.global_lock:
-            LOGGER.debug("Session registry global lock acquired")
-            self.registry[session_id].cycle = self.registry[session_id].snapshot_cycle
-            self.registry[session_id].snapshot_cycle = None
-            LOGGER.debug("Updated cycle of session '{}' to {} and cleared snapshot cycle".format(session_id, self.registry[session_id].cycle))
+        with self.registry[session_id].checkin_lock:
+            LOGGER.debug("Issuing server to rollback machine for session '{}'".format(session_id))
+            utils.rollback_machine(session_id, self.registry[session_id].address)
+            self.registry[session_id].address = None
+            error_msg = "Unable to rollback machine for session '{}': no checkin request from new machine".format(session_id)
+            while True:
+                self._wait_for_checkin(session_id, error_msg)
+                if self.registry[session_id].address:
+                    LOGGER.debug("Executed rollingback machine for session '{}'".format(session_id))
+                    LOGGER.debug("Acquiring session registry global lock")
+                    #Acquiring lock to write on session registry
+                    with self.global_lock:
+                        LOGGER.debug("Session registry global lock acquired")
+                        self.registry[session_id].cycle = self.registry[session_id].snapshot_cycle
+                        self.registry[session_id].snapshot_cycle = None
+                        LOGGER.debug("Updated cycle of session '{}' to {} and cleared snapshot cycle"
+                                .format(session_id, self.registry[session_id].cycle))
+                    break
 
     def recreate_machine(self, session_id):
         if (session_id not in self.registry.keys()):
@@ -359,6 +403,7 @@ class SessionRegistryManager:
         #Shutting down old server if any
         if (self.registry[session_id].address):
             utils.shutdown_cartesi_machine_server(session_id, self.registry[session_id].address)
+            self.kill_session(session_id)
 
         LOGGER.debug("Acquiring session registry global lock")
         #Acquiring lock to write on session registry
@@ -372,7 +417,7 @@ class SessionRegistryManager:
         LOGGER.debug("Cleaned old server session data for session '{}'".format(session_id))
 
         #Instantiate new cartesi machine server
-        self.create_new_cartesi_machine_server(session_id)
+        self.create_new_cartesi_machine_server(session_id, self.server_address, self.checkin_address)
 
         #Communication received, create new cartesi machine using saved parameters
         self.create_machine(session_id, self.registry[session_id].creation_machine_req)
@@ -439,8 +484,9 @@ class CartesiSession:
     def __init__(self, session_id):
         self.id = session_id
         self.lock = Lock()
+        self.checkin_lock = Lock()
+        self.checkin_cond = Condition(lock=self.checkin_lock)
         self.address = None
-        self.address_set_event = Event()
         self.cycle = 0
         self.snapshot_cycle = None
         self.creation_machine_req = None

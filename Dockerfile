@@ -14,12 +14,16 @@ RUN \
     && cd /root/grpc-interfaces \
     && python3 -m grpc_tools.protoc -I. \
         --python_out=./out --grpc_python_out=./out \
-        cartesi-machine.proto machine-manager.proto \
-        versioning.proto
+        cartesi-machine.proto cartesi-machine-checkin.proto \
+        machine-manager.proto versioning.proto
 
 # Container final image
 # ----------------------------------------------------
-FROM cartesi/machine-emulator:0.7.0
+# NOTE: the proper machine-emulator image is not released yet
+# so using image from the private repo. Should be changed prior to
+# releasing.
+
+FROM cartesicorp/machine-emulator:0.8.0
 
 LABEL maintainer="Carlo Fragni <carlo@cartesi.io>"
 
@@ -36,9 +40,10 @@ RUN \
 COPY --from=build-image /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 
-RUN mkdir -p $BASE/bin $MANAGER_PATH/proto
+RUN mkdir -p $BASE/bin $MANAGER_PATH/proto $MANAGER_PATH/src
 
 COPY --from=build-image /root/grpc-interfaces/out/*.py $MANAGER_PATH/proto/
+COPY ./src/*.py $MANAGER_PATH/src/
 COPY ./*.py $MANAGER_PATH/
 COPY ./machine-manager $BASE/bin/machine-manager
 

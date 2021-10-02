@@ -2,6 +2,6 @@
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 MANAGER_DIR=${MANAGER_PATH:-${SCRIPTPATH}}
-export PYTHONPATH=${MANAGER_DIR}/proto
+export PYTHONPATH=${MANAGER_DIR}/proto:${MANAGER_DIR}/src
 
-cd ${MANAGER_DIR} && python3 manager_server.py $@
+cd ${MANAGER_DIR} && python3 manager.py $@

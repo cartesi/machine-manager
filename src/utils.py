@@ -58,11 +58,15 @@ def configure_log(logger):
 
     return logger
 
-def new_cartesi_machine_server(session_id, server_address):
+def new_cartesi_machine_server(session_id, server_address, checkin_address):
 
     LOGGER.info("Creating a cartesi machine server with session_id '{}'".format(session_id))
 
-    cmd_line = ["/opt/cartesi/bin/cartesi-machine-server", server_address]
+    cmd_line = ["/opt/cartesi/bin/remote-cartesi-machine",
+            "--server-address={}".format(server_address),
+            "--session-id={}".format(session_id),
+            "--checkin-address={}".format(checkin_address)]
+
     LOGGER.debug("Executing {}".format(" ".join(cmd_line)))
     proc = None
     try:
@@ -248,7 +252,7 @@ def wait_for_server_availability(session_id, address):
                 response = stub.GetVersion(cartesi_machine_pb2.Void())
                 LOGGER.debug("Cartesi machine server version for session_id '{}' is '{}'".format(session_id, response))
                 break
-            except Exception:
+            except Exception as e:
                 LOGGER.warning("Cartesi machine server for session_id '{}' is not yet ready".format(session_id))
                 retry += 1
                 time.sleep(SLEEP_TIME)
@@ -371,9 +375,10 @@ def dump_get_proof_response_to_json(proof_resp):
     proof = proof_resp.proof
     resp_dict = {
             'proof': {
-                'address': proof.address,
-                'log2_size': proof.log2_size,
+                'target_address': proof.target_address,
+                'log2_target_size': proof.log2_target_size,
                 'target_hash': "0x{}".format(proof.target_hash.data.hex()),
+                'log2_root_size': proof.log2_root_size,
                 'root_hash': "0x{}".format(proof.root_hash.data.hex()),
                 'sibling_hashes' : []
             }

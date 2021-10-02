@@ -37,14 +37,15 @@ Download the test image files:
 %./download-test-files
 ```
 
-Execute a Docker container of the image just built, it will automatically start the machine manager server listening on port 50051:
+Execute a Docker container of the image just built, it will automatically start the machine manager server listening on port 50051 and check-in server listening on port 50052:
 ```console
-% docker run -p 50051:50051 -v $(pwd)/test-files:/root/host cartesi/machine-manager
+% docker run -p 50051:50051 -p 50052:50052 -v $(pwd)/test-files:/root/host cartesi/machine-manager
 ```
 
-After this step, you should be welcomed by a log message stating that the server is up and listening on port 50051:
+After this step, you should be welcomed by a log message stating that the servers are up and listening on port 50051 and 50052:
 ```console
-% INFO __main__ 338 - serve: Server started, listening on address 0.0.0.0 and port 50051
+% INFO __main__ 338 - serve: Checkin service started, listening on address 0.0.0.0:50052
+% INFO __main__ 338 - serve: Server started, listening on address 0.0.0.0:50051
 ```
 
 Open another terminal to start another session on the ephemeral docker container and execute the test client:
@@ -90,21 +91,22 @@ $ ./machine-manager
 The server has a couple of options to customize it's behavior, you can check them using the -h option:
 ```console
 ./machine-manager -h
-usage: ./machine-manager [-h] [--address ADDRESS] [--port PORT] [--defective]
+usage: ./machine-manager [-h] [--address ADDRESS] [--port PORT] [--checkin PORT] [--defective]
 
 Instantiates a machine manager server, responsible for managing and interacting
 with multiple cartesi machine instances
 
 optional arguments:
-  -h, --help            show this help message and exit
-  --address ADDRESS, -a ADDRESS
-                        Address to listen (default: localhost)
-  --port PORT, -p PORT  Port to listen (default: 50051)
-  --defective, -d       Makes server behave improperly, injecting errors
-                        silently in the issued commands
-                        -----------------------WARNING!-----------------------
-                        FOR TESTING PURPOSES ONLY!!!
-                        ------------------------------------------------------
+  -h, --help               show this help message and exit
+  --address ADDRESS, -a    ADDRESS
+                           Address to listen (default: localhost)
+  --port PORT, -p PORT     Port to listen (default: 50051)
+  --checkin PORT, -c PORT  Checkin service port (default: 50052)
+  --defective, -d          Makes server behave improperly, injecting errors
+                           silently in the issued commands
+                           -----------------------WARNING!-----------------------
+                           FOR TESTING PURPOSES ONLY!!!
+                           ------------------------------------------------------
 ```
 
 As stated in the help, do not use -d option in production as it will make the server misbehave silently, a useful feature only for testing purposes.

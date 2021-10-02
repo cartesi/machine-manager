@@ -41,13 +41,14 @@ IMAGE_FILENAME = "image_filename"
 LENGTH = "length"
 SHARED = "shared"
 BOOTARGS = "bootargs"
-YIELD = "yield"
+YIELD_MANUAL = "yield_manual"
+YIELD_AUTOMATIC = "yield_automatic"
 LABEL = "label"
 
 CONTAINER_SERVER = False
 
 TEST_ROM = {
-    BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw {} -- for i in $(seq 0 5 1000); do yield progress $i; done",
+    BOOTARGS: "console=hvc0 rootfstype=ext2 root=/dev/mtdblock0 rw {} -- for i in $(seq 0 5 1000000); do yield manual progress $i; done",
     IMAGE_FILENAME: "rom.bin"
 }
 
@@ -72,7 +73,8 @@ TEST_DRIVES = [
 ]
 
 HTIF_CONFIG = {
-    YIELD: True
+    YIELD_MANUAL: False,
+    YIELD_AUTOMATIC: True
 }
 
 STORE_DIRECTORY = "store-test"
@@ -82,7 +84,7 @@ def build_mtdparts_str(drives):
     mtdparts_str = "mtdparts="
 
     for i,drive in enumerate(drives):
-        mtdparts_str += "flash.%d:-(%s)".format(i, drive[LABEL])
+        mtdparts_str += "flash.{}:-({})".format(i, drive[LABEL])
 
     return mtdparts_str
 
@@ -97,16 +99,17 @@ def make_new_session_request(force=False):
     for drive in TEST_DRIVES:
         image_filename_path = files_dir + drive[IMAGE_FILENAME]
         print("New flash_drive config:\nDrive image_filename: {}\nStart: {}\nLength: {}\nShared: {}".format(image_filename_path, drive[START], drive[LENGTH], drive[SHARED]))
-        drive_msg = cartesi_machine_pb2.FlashDriveConfig(start=drive[START], length=drive[LENGTH], image_filename=image_filename_path,
+        drive_msg = cartesi_machine_pb2.MemoryRangeConfig(start=drive[START], length=drive[LENGTH], image_filename=image_filename_path,
                                            shared=drive[SHARED])
         drives_msg.append(drive_msg)
     bootargs_str = TEST_ROM[BOOTARGS].format(build_mtdparts_str(TEST_DRIVES))
     rom_image_filename = files_dir + TEST_ROM[IMAGE_FILENAME]
     print('='*80 + "\nRom config:\nBootargs: {}\nImage filename: {}".format(bootargs_str, rom_image_filename))
     rom_msg = cartesi_machine_pb2.ROMConfig(bootargs=bootargs_str, image_filename=rom_image_filename)
-    print('='*80 + "\nHTIF config:\nYield: {}".format(HTIF_CONFIG[YIELD]))
+    print('='*80 + "\nHTIF config:\nYield automatic: {}\nYield manual: {}".format(HTIF_CONFIG[YIELD_AUTOMATIC], HTIF_CONFIG[YIELD_MANUAL]))
     htif_msg = cartesi_machine_pb2.HTIFConfig()
-    setattr(htif_msg, "yield_progress", HTIF_CONFIG[YIELD])
+    setattr(htif_msg, "yield_automatic", HTIF_CONFIG[YIELD_AUTOMATIC])
+    setattr(htif_msg, "yield_manual", HTIF_CONFIG[YIELD_MANUAL])
 
     machine_config = cartesi_machine_pb2.MachineConfig(rom=rom_msg, ram=ram_msg, flash_drive=drives_msg, htif=htif_msg)
     machine_msg = cartesi_machine_pb2.MachineRequest(config=machine_config)
@@ -218,9 +221,10 @@ def dump_run_response_to_json(run_resp):
 def dump_proof_to_json(proof):
 
     proof_dict = {
-        'address': proof.address,
-        'log2_size': proof.log2_size,
+        'target_address': proof.target_address,
+        'log2_target_size': proof.log2_target_size,
         'target_hash': "0x{}".format(proof.target_hash.data.hex()),
+        'log2_root_size': proof.log2_root_size,
         'root_hash': "0x{}".format(proof.root_hash.data.hex()),
         'sibling_hashes' : []
     }

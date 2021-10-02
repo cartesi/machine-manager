@@ -12,48 +12,34 @@ specific language governing permissions and limitations under the License.
 """
 
 from concurrent import futures
-from threading import Lock
-import signal
-import time
-import math
-import grpc
-import sys
-import traceback
-import argparse
+from threading import Lock, currentThread
 import pickle
+import time
+import traceback
+import grpc
 from grpc_reflection.v1alpha import reflection
 
 import machine_manager_pb2_grpc
 import machine_manager_pb2
 import cartesi_machine_pb2
+import cartesi_machine_pb2_grpc
 import utils
-from session_registry import SessionIdException, AddressException, RollbackException
+from session_registry import SessionIdException, AddressException, RollbackException, CheckinException
 
-# docker graceful shutdown, raise a KeyboardInterrupt in case of SIGTERM
-def handle_sigterm(*args):
-    raise KeyboardInterrupt()
-
-signal.signal(signal.SIGTERM, handle_sigterm)
 
 LOGGER = utils.get_new_logger(__name__)
 LOGGER = utils.configure_log(LOGGER)
-
-LISTENING_ADDRESS = 'localhost'
-LISTENING_PORT = 50051
-SLEEP_TIME = 5
 
 class NotReadyException(Exception):
     pass
 
 class SessionJob:
-
     def __init__(self, session_id):
         self.id = session_id
         self.job_hash = None
         self.job_future = None
 
 class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
-
     def __init__(self, session_registry_manager):
         self.executor = futures.ThreadPoolExecutor(max_workers=10)
         self.session_registry_manager = session_registry_manager
@@ -64,12 +50,9 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
     def __set_job_cache__(self, request, future):
         LOGGER.debug("Setting job cache")
         result = future.result()
-
         request_hash = pickle.dumps(request)
-
         #Cache the job only if no exception raised
         self.job_cache[request_hash] = future
-
         return result
 
     def __set_job_future__(self, session_id, future):
@@ -141,6 +124,11 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             LOGGER.error(e)
             context.set_details("{}".format(e))
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Checkin request failed
+        except CheckinException as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
         #Generic error catch
         except Exception as e:
             LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
@@ -194,6 +182,11 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             LOGGER.error(e)
             context.set_details("{}".format(e))
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Checkin request failed
+        except CheckinException as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
         #Generic error catch
         except Exception as e:
             LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
@@ -221,12 +214,10 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
                 step_params = cartesi_machine_pb2.StepRequest(log_type=log_type)
                 LOGGER.info("Step parameters set to default")
 
-
             LOGGER.info("New session step requested for session_id {} with initial cycle {}\nLog proofs: {}\nLog annotations: {}".format(session_id, initial_cycle, step_params.log_type.proofs, step_params.log_type.annotations))
 
             #Validate cycle value
             utils.validate_cycles([initial_cycle])
-
             return self.session_registry_manager.step_session(session_id, initial_cycle, step_params)
 
         #No session with provided id, address issue, bad initial cycle provided or problem during rollback
@@ -234,6 +225,11 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             LOGGER.error(e)
             context.set_details("{}".format(e))
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Checkin request failed
+        except CheckinException as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
         #Generic error catch
         except Exception as e:
             LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
@@ -280,6 +276,11 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             LOGGER.error(e)
             context.set_details("{}".format(e))
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Checkin request failed
+        except CheckinException as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
         #Generic error catch
         except Exception as e:
             LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
@@ -303,6 +304,11 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             LOGGER.error(e)
             context.set_details("{}".format(e))
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Checkin request failed
+        except CheckinException as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
         #Generic error catch
         except Exception as e:
             LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
@@ -327,28 +333,23 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             LOGGER.error(e)
             context.set_details("{}".format(e))
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        #Checkin request failed
+        except CheckinException as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
         #Generic error catch
         except Exception as e:
             LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
             context.set_details('An exception with message "{}" was raised!'.format(e))
             context.set_code(grpc.StatusCode.UNKNOWN)
 
-def serve(args):
-    listening_add = args.address
-    listening_port = args.port
 
-    #Importing the defective session registry if defective flag is set
-    if args.defective:
-        from defective_session_registry import SessionRegistryManager
-    else:
-        from session_registry import SessionRegistryManager
-
-    manager_address = '{}:{}'.format(listening_add, listening_port)
-    session_registry_manager = SessionRegistryManager()
+def start_manager_server(args, registry_manager):
+    manager_address = '{}:{}'.format(args.address, args.port)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    machine_manager_pb2_grpc.add_MachineManagerServicer_to_server(_MachineManager(session_registry_manager),
+    machine_manager_pb2_grpc.add_MachineManagerServicer_to_server(_MachineManager(registry_manager),
                                                       server)
-    
     SERVICE_NAMES = (
         machine_manager_pb2.DESCRIPTOR.services_by_name['MachineManager'].full_name,
         reflection.SERVICE_NAME,
@@ -356,59 +357,12 @@ def serve(args):
     reflection.enable_server_reflection(SERVICE_NAMES, server)
     server.add_insecure_port(manager_address)
     server.start()
-    LOGGER.info("Server started, listening on address {} and port {}".format(listening_add, listening_port))
-    try:
-        while True:
-            time.sleep(SLEEP_TIME)
-    except KeyboardInterrupt:
-        LOGGER.info("\nIssued to shut down")
+    LOGGER.info("Server started, listening on address {}".format(manager_address))
 
-        LOGGER.debug("Acquiring session registry global lock")
-        #Acquiring lock to write on session registry
-        with session_registry_manager.global_lock:
-            LOGGER.debug("Session registry global lock acquired")
-            session_registry_manager.shutting_down = True
-
-        #Shutdown all active sessions servers
-        for session_id in session_registry_manager.registry.keys():
-            LOGGER.debug("Acquiring lock for session {}".format(session_id))
-            with session_registry_manager.registry[session_id].lock:
-                LOGGER.debug("Lock for session {} acquired".format(session_id))
-                if (session_registry_manager.registry[session_id].address):
-                    utils.shutdown_cartesi_machine_server(session_id, session_registry_manager.registry[session_id].address)
-
-        shutdown_event = server.stop(0)
-
-        LOGGER.info("Waiting for server to stop")
-        shutdown_event.wait()
-        LOGGER.info("Server stopped")
-
-if __name__ == '__main__':
-
-    #Adding argument parser
-    description = "Instantiates a machine manager server, responsible for managing and interacting with multiple cartesi machine instances"
-
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument(
-        '--address', '-a',
-        dest='address',
-        default=LISTENING_ADDRESS,
-        help='Address to listen (default: {})'.format(LISTENING_ADDRESS)
-    )
-    parser.add_argument(
-        '--port', '-p',
-        dest='port',
-        default=LISTENING_PORT,
-        help='Port to listen (default: {})'.format(LISTENING_PORT)
-    )
-    parser.add_argument(
-        '--defective', '-d',
-        dest='defective',
-        action='store_true',
-        help='Makes server behave improperly, injecting errors silently in the issued commands\n\n' + '-'*23 + 'WARNING!' + '-'*23 + 'FOR TESTING PURPOSES ONLY!!!\n' + 54*'-'
-    )
-
-    #Getting arguments
-    args = parser.parse_args()
-
-    serve(args)
+    t = currentThread()
+    while getattr(t, "do_run", True):
+        time.sleep(1)
+    shutdown_event = server.stop(0)
+    LOGGER.info("Waiting for manager server to stop")
+    shutdown_event.wait()
+    LOGGER.info("Manager server stopped")
