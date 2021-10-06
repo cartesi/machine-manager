@@ -113,27 +113,10 @@ As stated in the help, do not use -d option in production as it will make the se
 
 ## Executing the test client
 
-Once you have the machine manager server up and running, you may want to test it is working correctly using the included test client, if the server is running natively and locally all you have to do is execute it with no additional arguments:
-```console
-$ ./test_client
-```
-
-The test client also has a couple of options to customize it's behavior, you may check them with the -h or --help option:
-```console
-$ ./test_client -h
-Starting at Fri Apr  5 19:20:45 2019
-usage: ./test_client [-h] [--address ADDRESS] [--port PORT] [--container]
-
-GRPC test client to the machine manager server
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --address ADDRESS, -a ADDRESS
-                        Machine manager server address
-  --port PORT, -p PORT  Machine manager server port
-  --container, -c       Fixes file references for when machine manager server
-                        is running from docker container
-```
+You may want to test machine manager is working correctly using the included test client. To execute it do the following:
+- `export CARTESI_IMAGE_PATH=/path/to/cartesi/machine/images`
+- `export CARTESI_BIN_PATH=/path/to/cartesi/binary/files` (the bin directory should also include machine manager itself)
+- `cd tests/rust-test-client && cargo test`
 
 ## Contributing
 

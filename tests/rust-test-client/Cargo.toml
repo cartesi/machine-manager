@@ -1,0 +1,25 @@
+[package]
+name = "rust-test-client"
+version = "0.1.0"
+edition = "2018"
+
+[[test]]
+name = "cucumber"
+harness = false
+
+[dependencies]
+tonic = "0.5"
+prost = "0.8"
+async-trait = "0.1.42"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "process"]}
+futures = "0.3.4"
+rand = "0.7.2"
+regex = "1.5"
+sha2 = "0.9.6"
+json = "0.12.4"
+
+[build-dependencies]
+tonic-build = "0.5"
+
+[dev-dependencies]
+"cucumber_rust" = "0.9"

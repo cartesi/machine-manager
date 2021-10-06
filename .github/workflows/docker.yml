@@ -18,6 +18,14 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v1
 
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.ubuntu-buildx-cache
+          key: ${{ runner.os }}-ubuntu-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ubuntu-buildx-
+
       - name: Login to Docker Hub
         uses: docker/login-action@v1
         with:
@@ -48,17 +56,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y python3 python3-pip
+          sudo apt-get install -y build-essential curl libboost-filesystem-dev libreadline-dev libboost-context-dev libboost-coroutine-dev libboost-serialization-dev libboost-filesystem-dev libssl-dev libc-ares-dev zlib1g-dev ca-certificates patchelf automake cmake clang-tidy-12 clang-format-12 liblua5.3-dev lua-socket python3 python3-pip
           pip3 install -r requirements.txt
+          curl https://sh.rustup.rs -sSf | bash -s -- -y
+          echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
 
-      - name: Generate grpc python code
+      - name: Download emulator binary files
         run: |
-          ls -lah
-          ./generate-cartesi-gprc
-
-      - name: Create test files directory
-        run: |
-          mkdir test-files
+          mkdir -p /opt
+          docker run --rm -v /opt:/opt/destination:rw -t cartesicorp/machine-emulator:develop /bin/cp -vr /opt/cartesi /opt/destination/
 
       - name: Set current git organization env var
         id: git_org
@@ -88,23 +94,40 @@ jobs:
           file: rom.bin
           token: ${{ secrets.CI_TOKEN }}
 
-      - name: Move images to test-files directory
+      - name: Move images to /opt/cartesi/share/images directory
         run: |
-          mv rom.bin rootfs.ext2 test-files/
-          mv ${{ env.KERNEL_FILE }} test-files/linux.bin
+          sudo chmod a+rwx -R /opt/cartesi
+          mv rom.bin rootfs.ext2 /opt/cartesi/share/images
+          mv ${{ env.KERNEL_FILE }} /opt/cartesi/share/images/linux.bin
+          sha256sum /opt/cartesi/share/images/linux.bin
+          sha256sum /opt/cartesi/share/images/rom.bin
+          sha256sum /opt/cartesi/share/images/rootfs.ext2
+          sha256sum /opt/cartesi/bin/remote-cartesi-machine
 
       - name: Set default tag name
         id: docker_image_default_tag
         run: echo ::set-output name=name::$(echo "${{ steps.docker_image_tags.outputs.tags }}" | head -n 1 | xargs)
 
-      - name: Run Tests
+      - name: Generate grpc python code
         run: |
-          docker run --rm --name cartesi_mm_container -p 50051:50051 -v $(pwd)/test-files:/root/host -t ${{ steps.docker_image_default_tag.outputs.name }} & timeout 20 bash -c 'while ! nc -q0 127.0.0.1 50051 < /dev/null > /dev/null 2>&1; do sleep 1; done' && ./test-client -c && echo "tests succeeded" && docker kill cartesi_mm_container
-          docker run --rm --name cartesi_mm_container -p 50051:50051 -v $(pwd)/test-files:/root/host -t ${{ steps.docker_image_default_tag.outputs.name }} /opt/cartesi/bin/machine-manager -a 0.0.0.0 -d & timeout 20 bash -c 'while ! nc -q0 127.0.0.1 50051 < /dev/null > /dev/null 2>&1; do sleep 1; done' && ./test-client -c && echo "tests succeeded" && docker kill cartesi_mm_container
+          ls -lah
+          ./generate-cartesi-gprc
 
-      - name: Clean up
+      - name: Copy machine manager to the cartesi binary folder
         run: |
-          docker run --rm --name cartesi_mm_container -v $(pwd):/root/host -t ${{ steps.docker_image_default_tag.outputs.name }} bash -c 'rm -rf /root/host/test-files'
+          pwd
+          mkdir /opt/cartesi/bin/src
+          mkdir /opt/cartesi/bin/proto
+          cp ./src/*.py /opt/cartesi/bin/src
+          cp ./proto/*.py /opt/cartesi/bin/proto
+          cp ./*.py /opt/cartesi/bin
+          cp ./machine-manager /opt/cartesi/bin/machine-manager
+
+      - name: Execute Machine Manager Tests
+        run: |
+          export CARTESI_BIN_PATH=/opt/cartesi/bin
+          export CARTESI_IMAGE_PATH=/opt/cartesi/share/images
+          cd tests/rust-test-client && cargo test --release
 
       - name: Build and push docker image
         id: docker_build
