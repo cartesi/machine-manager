@@ -135,6 +135,27 @@ class _MachineManager(machine_manager_pb2_grpc.MachineManagerServicer):
             context.set_details('An exception with message "{}" was raised!'.format(e))
             context.set_code(grpc.StatusCode.UNKNOWN)
 
+    def EndSession(self, request, context):
+        try:
+            if self.ServerShuttingDown(context):
+                return
+
+            session_id = request.session_id
+            silent = request.silent
+            LOGGER.info("End session requested for session id {}".format(session_id))
+            return self.session_registry_manager.end_session(session_id, silent)
+
+        # No session with provided id or address issue
+        except (SessionIdException, AddressException) as e:
+            LOGGER.error(e)
+            context.set_details("{}".format(e))
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+        # Generic error catch
+        except Exception as e:
+            LOGGER.error("An exception occurred: {}\nTraceback: {}".format(e, traceback.format_exc()))
+            context.set_details('An exception with message "{}" was raised!'.format(e))
+            context.set_code(grpc.StatusCode.UNKNOWN)
+
     def SessionRun(self, request, context):
         try:
             if self.ServerShuttingDown(context):

@@ -16,6 +16,7 @@ import subprocess
 import time
 import utils
 
+import cartesi_machine_pb2
 
 LOGGER = utils.get_new_logger(__name__)
 LOGGER = utils.configure_log(LOGGER)
@@ -70,7 +71,6 @@ class SessionRegistryManager:
             raise SessionKillException(err_msg)
 
     def new_session(self, session_id, machine_req, force=False):
-
         #Checking if force is enabled
         if (force):
             LOGGER.debug("Force is enabled for creating new session with id {}".format(session_id))
@@ -103,8 +103,21 @@ class SessionRegistryManager:
 
         return initial_hash
 
-    def run_session(self, session_id, final_cycles):
+    def end_session(self, session_id, silent):
+        if (session_id not in self.registry.keys()):
+            raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
+        if (not self.registry[session_id].address):
+            raise AddressException("Address not set for server with session_id '{}'. Check if machine server was created correctly".format(session_id))
 
+        utils.shutdown_cartesi_machine_server(session_id, self.registry[session_id].address)
+        LOGGER.debug("Acquiring session registry global lock")
+        with self.global_lock:
+            LOGGER.debug("Session registry global lock acquired".format(session_id))
+            del self.registry[session_id]
+            LOGGER.debug("Session {} removed from registry".format(session_id))
+        return cartesi_machine_pb2.Void()
+
+    def run_session(self, session_id, final_cycles):
         summaries = []
         hashes = []
         desired_cycles = [c for c in final_cycles]
@@ -400,10 +413,9 @@ class SessionRegistryManager:
         if (session_id not in self.registry.keys()):
             raise SessionIdException("No session in registry with provided session_id: {}".format(session_id))
 
-        #Shutting down old server if any
+        # Shutting down old server if any
         if (self.registry[session_id].address):
             utils.shutdown_cartesi_machine_server(session_id, self.registry[session_id].address)
-            self.kill_session(session_id)
 
         LOGGER.debug("Acquiring session registry global lock")
         #Acquiring lock to write on session registry

@@ -91,7 +91,6 @@ def new_cartesi_machine_server(session_id, server_address, checkin_address):
     LOGGER.info("Cartesi machine server created for session_id '{}'".format(session_id))
 
 def new_machine(session_id, address, machine_req):
-
     LOGGER.debug("Connecting to cartesi machine server from session '{}' in address '{}'".format(session_id, address))
     with grpc.insecure_channel(address) as channel:
         stub = cartesi_machine_pb2_grpc.MachineStub(channel)
