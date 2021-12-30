@@ -8,5 +8,5 @@ Feature: SessionGetProof feature
 
         Examples:
             | cycle |        address      | size |                             hash                                 |
-            |  30   |          288        |  3   | 5CBD4721528040BDFD9D292626647AA8C123CB8937F9ED9498B61AFBBF8AA851 |
-            |  30   |          288        |  4   | BFC8C9F0602C6CAAE87CCE97C128BC2E00A3B788680FA9C6A1CEC93447A7BDAF |
+            |  30   |          288        |  3   | B2B4E88AC8976A6F978D4D5066AAFB85C9E1ED25150F7B686571E3924CE350F8 |
+            |  30   |          288        |  4   | 61AA9A9615CD9F45CC8F982BF07687C72E043723CC54959164D4235184B1E1D3 |

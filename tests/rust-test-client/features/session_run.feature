@@ -7,11 +7,11 @@ Feature: SessionRun feature
         When client asks server to run session
         Then server returns machine hashes:
             | cycles | hash                                                             |
-            |   0    | 27688E9BDB89F7ED6C7259720D23FA93C3C2102A614A34B2FF3D42FF8B95BE6E |
-            |   15   | 6792D74EF37DA87126FD276E4AA1A0F18520FF7828C1981DE45120F2D7AA08BC |
-            |   30   | A9904C4F02092E54B4EB1FE2490E149632544DF77C4F5EDDCAF2FA47FE1640FE |
-            |   45   | BCFA197858A199EF924150D7F3AA1BC8B35352334550519AC1D46A22C54AAAE8 |
-            |   60   | DC679DFF5089A2F9E736EF6C421C5AE1F5B6EA033640109F78230E267FC2D812 |
+            |   0    | E6B64F49947D3AC83F7B54E57E47081657813AB679A433B7F5D3E1D136F66072 |
+            |   15   | 4BD8412455EBB67328A5FF8B9777DD1AF10C71EF8A8C3F6E92F06292090A4A4D |
+            |   30   | BB9CFEFF538D6C2D956D88D2E243C4496B819E59B63C13EF5016506C586006AB |
+            |   45   | 86775B6D8B1DB70C6AEE81A448F29879F20F82F0C5907D6C43964FC49AF23C30 |
+            |   60   | 2A263E0E58691C40E6F345BBCFD5BA307F7DD0F4CED6D84CE1DEEB3765A2102B |
 
     Scenario: run with rollback forcing
 
@@ -25,9 +25,9 @@ Feature: SessionRun feature
         When client asks server to run session
         Then server returns machine hashes:
             | cycles | hash                                                             |
-            |   15   | 6792D74EF37DA87126FD276E4AA1A0F18520FF7828C1981DE45120F2D7AA08BC |
-            |   30   | A9904C4F02092E54B4EB1FE2490E149632544DF77C4F5EDDCAF2FA47FE1640FE |
-            |   45   | BCFA197858A199EF924150D7F3AA1BC8B35352334550519AC1D46A22C54AAAE8 |
+            |   15   | 4BD8412455EBB67328A5FF8B9777DD1AF10C71EF8A8C3F6E92F06292090A4A4D |
+            |   30   | BB9CFEFF538D6C2D956D88D2E243C4496B819E59B63C13EF5016506C586006AB |
+            |   45   | 86775B6D8B1DB70C6AEE81A448F29879F20F82F0C5907D6C43964FC49AF23C30 |
 
     Scenario: run with recreation forcing
 
@@ -41,9 +41,9 @@ Feature: SessionRun feature
         When client asks server to run session
         Then server returns machine hashes:
             | cycles | hash                                                             |
-            |   1    | AF362E5BF0CC2746B75D272FAA0ADD7E821671E2B074A057C796CC187253C29F |
-            |   5    | 05D049BA6779C38AB1C563166E664495E1ACB22C864B7DE2FBFE974FF39E4110 |
-            |   10   | FA85F7B995A21BE9AFDAAB9F38639F5C814102FD1F56ECC210F219F64489C452 |
+            |   1    | 56B0404F692CB6EFDA1E8088164D70FB35A29751BB7AB5EE493B02059A06B176 |
+            |   5    | 3ADA98431056653629CC252A60CD59EAFEF39FD8A1E6CB8C004B88890B2BF662 |
+            |   10   | 92C1A0FF2EDE625FFF78AB87C8537EB216D9B8044C5BAD5F1D3BC5ADEA0F72AA |
 
     Scenario: run with no need for any special effort
 
@@ -56,7 +56,7 @@ Feature: SessionRun feature
         When client asks server to run session
         Then server returns machine hashes:
             | cycles | hash                                                             |
-            |   15   | 6792D74EF37DA87126FD276E4AA1A0F18520FF7828C1981DE45120F2D7AA08BC |
+            |   15   | 4BD8412455EBB67328A5FF8B9777DD1AF10C71EF8A8C3F6E92F06292090A4A4D |
 
     Scenario: long run
         Given machine manager server is up
@@ -65,4 +65,4 @@ Feature: SessionRun feature
         When client asks server to run session
         Then server returns machine hashes:
             |  cycles   | hash                                                             |
-            | 500000000 | 029F0C9F2129534C77E901D7333FB06438F14F7232FECC643C5791E06AC9789C |
+            | 500000000 | F1035CAB45480B43DFA5F7B2FDE2ECAD1B44EF08D1EF7D02A598A3010AE4ACD7 |

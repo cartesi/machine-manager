@@ -8,4 +8,4 @@ Feature: SessionStoreLoad feature
         And machine manager server is able to execute this machine for 60 cycles
         And server returns machine hashes:
             | cycles | hash                                                             |
-            |   60   | DC679DFF5089A2F9E736EF6C421C5AE1F5B6EA033640109F78230E267FC2D812 |
+            |   60   | 2A263E0E58691C40E6F345BBCFD5BA307F7DD0F4CED6D84CE1DEEB3765A2102B |

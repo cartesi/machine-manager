@@ -19,11 +19,9 @@ RUN \
 
 # Container final image
 # ----------------------------------------------------
-# NOTE: the proper machine-emulator image is not released yet
-# so using image from the private repo. Should be changed prior to
-# releasing.
-
-FROM cartesicorp/machine-emulator:0.8.0
+ARG EMULATOR_REPOSITORY=cartesi/machine-emulator
+ARG EMULATOR_VERSION=0.8.0
+FROM ${EMULATOR_REPOSITORY}:${EMULATOR_VERSION}
 
 LABEL maintainer="Carlo Fragni <carlo@cartesi.io>"
 
