@@ -1,3 +1,5 @@
+ARG EMULATOR_REPOSITORY=cartesi/machine-emulator
+ARG EMULATOR_VERSION=latest
 FROM ubuntu:20.04 as build-image
 
 # Install python and other dependencies
@@ -5,30 +7,31 @@ RUN apt-get update && apt-get install -y python3 python3-pip
 
 COPY requirements.txt /root/
 
-RUN GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=$(nproc) pip3 install --user -r /root/requirements.txt
+ENV PYTHON_INSTALL /opt/cartesi/share/python
+RUN GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=$(nproc) pip3 install --target=$PYTHON_INSTALL -r /root/requirements.txt
 
-# Generating python grpc code
-COPY ./lib/grpc-interfaces /root/grpc-interfaces
+COPY . /root
+ENV PYTHONPATH=$PYTHONPATH:$PYTHON_INSTALL
 RUN \
-    mkdir -p /root/grpc-interfaces/out \
-    && cd /root/grpc-interfaces \
+    mkdir -p /root/proto \
+    && cd /root/lib/grpc-interfaces \
     && python3 -m grpc_tools.protoc -I. \
-        --python_out=./out --grpc_python_out=./out \
+        --python_out=/root/proto --grpc_python_out=/root/proto \
         cartesi-machine.proto cartesi-machine-checkin.proto \
         machine-manager.proto versioning.proto
 
+RUN cd /root && ./install.sh
+
 # Container final image
 # ----------------------------------------------------
-# NOTE: the proper machine-emulator image is not released yet
-# so using image from the private repo. Should be changed prior to
-# releasing.
-
-FROM cartesicorp/machine-emulator:0.8.0
+ARG EMULATOR_REPOSITORY
+ARG EMULATOR_VERSION
+FROM ${EMULATOR_REPOSITORY}:${EMULATOR_VERSION}
 
 LABEL maintainer="Carlo Fragni <carlo@cartesi.io>"
 
 ENV BASE /opt/cartesi
-ENV MANAGER_PATH $BASE/share/machine-manager
+ENV MANAGER_PATH $BASE/bin
 
 # Install python and other dependencies
 RUN \
@@ -36,17 +39,9 @@ RUN \
     && apt-get install -y python3 libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy python packages and make sure scripts in .local are usable:
-COPY --from=build-image /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
-
-RUN mkdir -p $BASE/bin $MANAGER_PATH/proto $MANAGER_PATH/src
-
-COPY --from=build-image /root/grpc-interfaces/out/*.py $MANAGER_PATH/proto/
-COPY ./src/*.py $MANAGER_PATH/src/
-COPY ./*.py $MANAGER_PATH/
-COPY ./machine-manager $BASE/bin/machine-manager
-
+ENV PYTHON_INSTALL /opt/cartesi/share/python
+ENV PATH=$PYTHON_INSTALL:$PATH
+COPY --from=build-image /opt/cartesi /opt/cartesi
 EXPOSE 50051
 
 # Changing directory to base

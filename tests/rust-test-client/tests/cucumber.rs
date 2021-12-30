@@ -3,13 +3,18 @@ mod world;
 use cucumber_rust::{Context, Cucumber};
 use world::{TestContext, TestWorld};
 
-pub fn compare_hashes(ha: &[u8], hb_s: &str) -> bool {
-    let ha_s = format!("{:02X?}", ha)
+pub fn hash_to_string(hash: &[u8]) -> String {
+    format!("{:02X?}", hash)
         .replace(" ", "")
         .replace(",", "")
         .replace("[", "")
-        .replace("]", "");
-    eprintln!("{} -> {}", hb_s, ha_s);
+        .replace("]", "")
+}
+
+pub fn compare_hashes(ha: &[u8], hb: &[u8]) -> bool {
+    let ha_s = hash_to_string(ha);
+    let hb_s = hash_to_string(hb);
+    eprintln!("{} || {}", ha_s, hb_s);
     ha_s == hb_s
 }
 
@@ -36,6 +41,8 @@ async fn main() {
         .context(Context::new().add(TestContext {
             server_ip: String::from("127.0.0.1"),
             server_port: 50051,
+            machine_ip: String::from("127.0.0.1"),
+            machine_port: 50055,
         }))
         .run_and_exit()
         .await

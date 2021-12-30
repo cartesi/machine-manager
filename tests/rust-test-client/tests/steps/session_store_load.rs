@@ -1,4 +1,4 @@
-use crate::steps::session_run::run_machine;
+use crate::steps::session_run::{get_verification_hashes, run_machine};
 use crate::world::{TestWorld, CARTESI_IMAGE_PATH};
 use cucumber_rust::{t, Steps};
 use rust_test_client::stubs::cartesi_machine::Hash;
@@ -50,7 +50,7 @@ pub fn steps() -> Steps<TestWorld> {
                 .grpc_client
                 .as_mut()
                 .unwrap()
-                .new_session(request)
+                .new_session(request.clone())
                 .await
                 .expect("Unable to perform restore request");
 
@@ -75,6 +75,8 @@ pub fn steps() -> Steps<TestWorld> {
             .await;
             if let session_run_response::RunOneof::Result(result) = ret.run_oneof.as_ref().unwrap()
             {
+                get_verification_hashes(&mut world, vec![ctx.matches[1].parse::<u64>().unwrap()])
+                    .await;
                 let result_hashes: Vec<Hash> = result.hashes.clone();
                 world
                     .response

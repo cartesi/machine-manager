@@ -1,8 +1,8 @@
 use crate::compare_hashes;
-use crate::steps::new_session::open_session_with_default_config;
+use crate::steps::new_session::{open_session_with_default_config, open_verification_session, close_sessions};
 use crate::world::TestWorld;
 use cucumber_rust::{t, Steps};
-use rust_test_client::stubs::cartesi_machine::Hash;
+use rust_test_client::stubs::cartesi_machine::{Hash, Void};
 use rust_test_client::stubs::cartesi_machine_manager::*;
 use rust_test_client::MachineManagerClientProxy;
 use std::boxed::Box;
@@ -22,15 +22,51 @@ pub fn strs_to_uints(matches: &Vec<String>) -> Vec<u64> {
         .collect()
 }
 
+pub async fn get_verification_hashes(world: &mut TestWorld, cycles: Vec<u64>) {
+    let mut verification_hashes: Vec<Hash> = vec![];
+    for cycle in cycles {
+        let request = world.machine_proxy.build_run_request(cycle);
+        if let Err(e) = world
+            .machine_proxy
+            .grpc_client
+            .as_mut()
+            .unwrap()
+            .run(request)
+            .await
+        {
+            panic!("Unable to make verification run: {}", e);
+        }
+        let response = world
+            .machine_proxy
+            .grpc_client
+            .as_mut()
+            .unwrap()
+            .get_root_hash(Void {})
+            .await;
+        let hash = match response {
+            Ok(val) => val.into_inner().hash.unwrap(),
+            Err(e) => panic!("Unable to get verification hash: {}", e),
+        };
+        verification_hashes.push(hash);
+    }
+    world.response.insert(
+        String::from("verification_hashes"),
+        Box::new(verification_hashes),
+    );
+}
+
 pub fn steps() -> Steps<TestWorld> {
     let mut steps: Steps<TestWorld> = Steps::new();
 
     steps.given_async(
         "a pristine machine manager server session",
         t!(|mut world, ctx| {
-            if let Err(e) = open_session_with_default_config(&mut world, &ctx, true).await {
+            let (ret, manager_request) =
+                open_session_with_default_config(&mut world, &ctx, true).await;
+            if let Err(e) = ret {
                 panic!("New session request failed: {}", e);
             }
+            open_verification_session(&mut world, &ctx, manager_request).await;
             world
         }),
     );
@@ -62,7 +98,9 @@ pub fn steps() -> Steps<TestWorld> {
                 .get(&String::from("exec_cycles"))
                 .and_then(|x| x.downcast_ref::<Vec<u64>>())
                 .take()
-                .expect("No Vec<u64> type in the result");
+                .expect("No Vec<u64> type in the result")
+                .clone();
+            get_verification_hashes(&mut world, cycles.clone().to_vec()).await;
             let ret = run_machine(cycles.to_vec(), &mut world.client_proxy).await;
             if let session_run_response::RunOneof::Result(result) = ret.run_oneof.as_ref().unwrap()
             {
@@ -76,23 +114,27 @@ pub fn steps() -> Steps<TestWorld> {
             }
         }),
     );
-    steps.then("server returns machine hashes:", |world, ctx| {
+    steps.then_async("server returns correct machine hashes", 
+        t!(|mut world, _ctx| {
         let result_hashes = world
             .response
             .get(&String::from("hashes"))
             .and_then(|x| x.downcast_ref::<Vec<Hash>>())
             .take()
             .expect("No Vec<Hash> type in the result");
-        let control_hashes = &ctx.step.table.as_ref().unwrap().rows;
-        // skipping the first row because of the table headings
-        assert!(control_hashes
+        let verification_hashes = world
+            .response
+            .get(&String::from("verification_hashes"))
+            .and_then(|x| x.downcast_ref::<Vec<Hash>>())
+            .take()
+            .expect("No verification hashes in the result");
+        assert!(verification_hashes
             .iter()
-            .skip(1)
             .zip(result_hashes)
-            .all(|(a, b)| compare_hashes(&b.data, &a[1])));
-
+            .all(|(a, b)| compare_hashes(&b.data, &a.data)));
+        close_sessions(&mut world).await;
         world
-    });
+    }));
 
     steps
 }

@@ -8,7 +8,8 @@ pub fn steps() -> Steps<TestWorld> {
     steps.given_async(
         "machine manager server with terminated session",
         t!(|mut world, ctx| {
-            if let Err(e) = open_session_with_default_config(&mut world, &ctx, false).await {
+            let (ret, _) = open_session_with_default_config(&mut world, &ctx, false).await;
+            if let Err(e) = ret {
                 panic!("New session request failed: {}", e);
             }
 

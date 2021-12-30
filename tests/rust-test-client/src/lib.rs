@@ -323,3 +323,59 @@ impl MachineManagerClientProxy {
         response
     }
 }
+
+#[derive(Default)]
+pub struct MachineClientProxy {
+    pub grpc_client: Option<machine_client::MachineClient<tonic::transport::Channel>>,
+}
+
+impl MachineClientProxy {
+    pub async fn connect(
+        &mut self,
+        server_ip: &str,
+        server_port: u32,
+    ) -> Result<(), tonic::transport::Error> {
+        let server_address = format!("http://{}:{}", server_ip, server_port);
+        self.grpc_client = Some(machine_client::MachineClient::connect(server_address).await?);
+        Ok(())
+    }
+
+    pub fn build_machine_request(&self, manager_request: NewSessionRequest) -> MachineRequest {
+        manager_request.machine.unwrap()
+    }
+
+    pub fn build_run_request(&self, limit: u64) -> RunRequest {
+        RunRequest { limit }
+    }
+
+    pub fn build_step_request(&self, manager_request: SessionStepRequest) -> StepRequest {
+        let session_step_request::StepParamsOneof::StepParams(step_request) =
+            manager_request.step_params_oneof.unwrap();
+        return step_request;
+    }
+
+    pub fn build_get_proof_request(
+        &self,
+        manager_request: SessionGetProofRequest,
+    ) -> GetProofRequest {
+        manager_request.target.unwrap()
+    }
+
+    pub fn build_store_request(&self, manager_request: SessionStoreRequest) -> StoreRequest {
+        manager_request.store.unwrap()
+    }
+
+    pub fn build_read_memory_request(
+        &self,
+        manager_request: SessionReadMemoryRequest,
+    ) -> ReadMemoryRequest {
+        manager_request.position.unwrap()
+    }
+
+    pub fn build_write_memory_request(
+        &self,
+        manager_request: SessionWriteMemoryRequest,
+    ) -> WriteMemoryRequest {
+        manager_request.position.unwrap()
+    }
+}

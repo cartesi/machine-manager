@@ -1,4 +1,5 @@
-use crate::{compare_hashes, world::TestWorld};
+use crate::{hash_to_string, world::TestWorld};
+use crate::steps::new_session::close_sessions;
 use cucumber_rust::{t, Steps};
 use rust_test_client::stubs::cartesi_machine_manager::SessionReadMemoryResponse;
 use std::boxed::Box;
@@ -68,7 +69,8 @@ pub fn steps() -> Steps<TestWorld> {
                 .take()
                 .unwrap();
             let read_bytes = &response.read_content.as_ref().unwrap().data;
-            assert!(compare_hashes(read_bytes, &ctx.matches[1][..]));
+            assert_eq!(hash_to_string(read_bytes), &ctx.matches[1][..]);
+            close_sessions(&mut world).await;
             world
         }),
     );
