@@ -1,11 +1,11 @@
 use crate::compare_hashes;
-use crate::steps::new_session::open_session_with_default_config;
+use crate::steps::new_session::{open_session_with_default_config, open_verification_session, close_sessions};
 use crate::steps::session_get_proof::proof_to_json;
 use crate::steps::session_run::{run_machine, strs_to_uints};
 use crate::world::TestWorld;
 use cucumber_rust::{t, Steps};
 use json::object;
-use rust_test_client::stubs::cartesi_machine::AccessLog;
+use rust_test_client::stubs::cartesi_machine::{AccessLog, StepResponse};
 use rust_test_client::stubs::cartesi_machine_manager::*;
 use sha2::Digest;
 use std::boxed::Box;
@@ -43,7 +43,9 @@ pub fn steps() -> Steps<TestWorld> {
     steps.given_regex_async(
         r#"a machine manager server with a machine executed for ((\d+,)*\d+) final cycles"#,
         t!(|mut world, ctx| {
-            if let Err(e) = open_session_with_default_config(&mut world, &ctx, true).await {
+            let (ret, manager_request) =
+                open_session_with_default_config(&mut world, &ctx, true).await;
+            if let Err(e) = ret {
                 panic!("New session request failed: {}", e);
             }
 
@@ -51,6 +53,22 @@ pub fn steps() -> Steps<TestWorld> {
             if let session_run_response::RunOneof::Progress(_) = ret.run_oneof.as_ref().unwrap() {
                 panic!("Invalid state: server job didn't finish");
             }
+
+            open_verification_session(&mut world, &ctx, manager_request).await;
+            for cycle in strs_to_uints(&ctx.matches) {
+                let request = world.machine_proxy.build_run_request(cycle);
+                if let Err(e) = world
+                    .machine_proxy
+                    .grpc_client
+                    .as_mut()
+                    .unwrap()
+                    .run(request)
+                    .await
+                {
+                    panic!("Unable to make verification run: {}", e);
+                }
+            }
+
             world
         }),
     );
@@ -66,32 +84,59 @@ pub fn steps() -> Steps<TestWorld> {
                 .grpc_client
                 .as_mut()
                 .unwrap()
-                .session_step(request)
+                .session_step(request.clone())
                 .await
             {
-                Ok(val) => world
-                    .response
-                    .insert(String::from("response"), Box::new(val.into_inner())),
+                Ok(val) => {
+                    let verification_request = world.machine_proxy.build_step_request(request);
+                    let verification_response = world
+                        .machine_proxy
+                        .grpc_client
+                        .as_mut()
+                        .unwrap()
+                        .step(verification_request)
+                        .await;
+                    if let Err(e) = verification_response {
+                        panic!("Unable to make verification step: {}", e);
+                    }
+
+                    world.response.insert(
+                        String::from("verification_response"),
+                        Box::new(verification_response.unwrap().into_inner()),
+                    );
+                    world
+                        .response
+                        .insert(String::from("response"), Box::new(val.into_inner()))
+                }
                 Err(e) => world.response.insert(String::from("error"), Box::new(e)),
             };
             world
         }),
     );
 
-    steps.then_regex_async(
-        r#"server returns access log which SHA256 sum is ((\d|[A-Z]){64})"#,
-        t!(|mut world, ctx| {
+    steps.then_async(
+        "server returns correct access log",
+        t!(|mut world, _ctx| {
             let response = world
                 .response
                 .get(&String::from("response"))
                 .and_then(|x| x.downcast_ref::<SessionStepResponse>())
                 .take()
                 .expect("No SessionStepResponse type in the result");
+            let verification_response = world
+                .response
+                .get(&String::from("verification_response"))
+                .and_then(|x| x.downcast_ref::<StepResponse>())
+                .take()
+                .expect("No verification StepResponse type in the result");
             let log_string = access_log_to_json(&response.log.as_ref().unwrap());
+            let verification_log_string =
+                access_log_to_json(&verification_response.log.as_ref().unwrap());
             assert!(compare_hashes(
                 &sha2::Sha256::digest(log_string.as_bytes()),
-                &ctx.matches[1][..]
+                &sha2::Sha256::digest(verification_log_string.as_bytes()),
             ));
+            close_sessions(&mut world).await;
             world
         }),
     );
