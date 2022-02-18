@@ -61,7 +61,7 @@ impl MachineCheckIn for ManagerCheckinService {
     ) -> Result<tonic::Response<Void>, tonic::Status> {
         let request = request.into_inner();
         log::debug!(
-            "got a check in request for session id: {} and address {} ",
+            "session id: {} got a check in request, address={} ",
             &request.session_id,
             &request.address
         );
@@ -89,7 +89,10 @@ impl MachineManagerService {
     ) -> Result<(), Status> {
         if let Some(current_request) = session.get_current_request() {
             if current_request == request_info {
-                log::debug!("got same operation request, operation already in progress");
+                log::debug!(
+                    "session id={} got same operation request, operation already in progress",
+                    &request_info.id
+                );
                 Err(tonic::Status::already_exists(
                     "operation already in progress",
                 ))
@@ -100,7 +103,7 @@ impl MachineManagerService {
             }
         } else {
             // No request is currently processed, set pending request as current
-            log::debug!("no request is currently processed, set pending request as current");
+            log::debug!("session id={} no request is currently processed, set pending request of type {} as current", &request_info.id, &request_info.r#type);
             session.set_current_request(request_info);
             Ok(())
         }
@@ -223,11 +226,11 @@ impl MachineManager for MachineManagerService {
         let session_id = &new_session_request.session_id;
         let force = new_session_request.force; // Force creating a new session
         log::info!(
-            "received new session request, session id='{}',",
+            "session id={} received new session request",
             &new_session_request.session_id
         );
         log::debug!(
-            "New session request info, session id='{}', {:#?}",
+            "New session request info, session id={}, {:#?}",
             &new_session_request.session_id,
             &request_info
         );
@@ -245,7 +248,7 @@ impl MachineManager for MachineManagerService {
                             // Create session from configuration
                             let config = grpc_cartesi_machine::MachineConfig::from(machine_config);
                             log::debug!(
-                                "creating session id='{}' from configuration {:#?}",
+                                "creating session id={} from configuration {:#?}",
                                 &session_id,
                                 &config
                             );
@@ -265,14 +268,14 @@ impl MachineManager for MachineManagerService {
                                     return if let Some(_) = err.to_string().find(&"already exists")
                                     {
                                         let error_message = format!(
-                                            "error creating new session id='{}'. Session already exists",
+                                            "error creating new session id={}. Session already exists",
                                             session_id
                                         );
                                         log::error!("{}", &error_message);
                                         Err(tonic::Status::invalid_argument(error_message))
                                     } else {
                                         let error_message = format!(
-                                            "Error creating new session id='{}'. Details: '{}'",
+                                            "Error creating new session id={}. Details: '{}'",
                                             session_id,
                                             err.to_string()
                                         );
@@ -288,7 +291,7 @@ impl MachineManager for MachineManagerService {
                                         Ok(hash) => Ok(Response::new(Hash::from(&hash))),
                                         Err(err) => {
                                             let error_message = format!(
-                                                "Error creating new session id='{}'. Details: '{}'",
+                                                "session id={} error creating new session. Details: '{}'",
                                                 &session_id,
                                                 err.to_string()
                                             );
@@ -299,7 +302,7 @@ impl MachineManager for MachineManagerService {
                                 }
                                 Err(err) => {
                                     let error_message = format!(
-                                        "Error creating new session id='{}' - unable to get machine hash. Details: '{}'",
+                                        "Error creating new session id={} - unable to get machine hash. Details: '{}'",
                                         &session_id,
                                         err.to_string()
                                     );
@@ -311,7 +314,7 @@ impl MachineManager for MachineManagerService {
                         machine_request::MachineOneof::Directory(directory) => {
                             // Session creation from directory
                             log::debug!(
-                                "creating session id='{}' with directory argument: {}",
+                                "creating session id={} with directory argument: {}",
                                 &session_id,
                                 directory
                             );
@@ -331,14 +334,14 @@ impl MachineManager for MachineManagerService {
                                     return if let Some(_) = err.to_string().find(&"already exists")
                                     {
                                         let error_message = format!(
-                                            "error creating new session id='{}'. Session already exists",
+                                            "error creating new session id={}. Session already exists",
                                             session_id
                                         );
                                         log::error!("{}", &error_message);
                                         Err(tonic::Status::invalid_argument(error_message))
                                     } else {
                                         let error_message = format!(
-                                            "error creating new session id='{}'. Details: '{}'",
+                                            "error creating new session id={}. Details: '{}'",
                                             session_id,
                                             err.to_string()
                                         );
@@ -360,7 +363,7 @@ impl MachineManager for MachineManagerService {
                                         }
                                         Err(err) => {
                                             let error_message = format!(
-                                                "Error creating new session id='{}'. Details: '{}'",
+                                                "Error creating new session id={}. Details: '{}'",
                                                 &session_id,
                                                 err.to_string()
                                             );
@@ -371,7 +374,7 @@ impl MachineManager for MachineManagerService {
                                 }
                                 Err(err) => {
                                     let error_message = format!(
-                                        "error creating new session id='{}' - unable to get machine hash. Details: '{}'",
+                                        "error creating new session id={} - unable to get machine hash. Details: '{}'",
                                         &session_id,
                                         err.to_string()
                                     );
@@ -383,7 +386,7 @@ impl MachineManager for MachineManagerService {
                     }
                 } else {
                     let error_message = format!(
-                        "error creating new session id='{}' - missing argument",
+                        "error creating new session id={} - missing argument",
                         &session_id
                     );
                     log::error!("{}", &error_message);
@@ -392,7 +395,7 @@ impl MachineManager for MachineManagerService {
             }
             None => {
                 let error_message = format!(
-                    "error creating new session id='{}' - missing argument",
+                    "error creating new session id={} - missing argument",
                     &session_id
                 );
                 log::error!("{}", &error_message);
@@ -409,13 +412,16 @@ impl MachineManager for MachineManagerService {
         let request_info = SessionRequest::from(&request);
         let run_request = request.into_inner();
         log::info!(
-            "received session run request, session id='{}', final_cycles={:?}",
+            "session id={} received session run request, final_cycles={:?}",
             &run_request.session_id,
             &run_request.final_cycles
         );
         let session_mut = self.find_session(&run_request.session_id).await?;
         if run_request.final_cycles.is_empty() {
-            let error_message = "Error running session - empty list of final cycles";
+            let error_message = format!(
+                "session id={} error running session - empty list of final cycles",
+                &run_request.session_id
+            );
             log::error!("{}", &error_message);
             return Err(tonic::Status::invalid_argument(error_message));
         }
@@ -458,7 +464,7 @@ impl MachineManager for MachineManagerService {
                     MachineManagerService::clear_request(&mut session); //Clear current RUN request
                 }
                 log::info!(
-                    "session run request for session_id='{}' processed successfully",
+                    "session_id='{}' run request processed successfully",
                     &run_request.session_id
                 );
                 Ok(Response::new(response))
@@ -481,7 +487,7 @@ impl MachineManager for MachineManagerService {
         let request_info = SessionRequest::from(&request);
         let step_request = request.into_inner();
         log::info!(
-            "received session step request, session id='{}', initial cycle: {}",
+            "session id={} received session step request, initial cycle: {}",
             &step_request.session_id,
             &step_request.initial_cycle
         );
@@ -507,7 +513,7 @@ impl MachineManager for MachineManagerService {
                                     };
                                 MachineManagerService::clear_request(&mut session);
                                 log::info!(
-                                    "session id='{}' step request executed successfully",
+                                    "session id={} step request executed successfully",
                                     &step_request.session_id
                                 );
                                 Ok(Response::new(response))
@@ -515,7 +521,8 @@ impl MachineManager for MachineManagerService {
                             Err(err) => {
                                 MachineManagerService::clear_request(&mut session);
                                 let error_message = format!(
-                                    "error executing session step for session id='{}'. Details:'{}'", &session.get_id(),
+                                    "error executing session step for session id={}. Details:'{}'",
+                                    &session.get_id(),
                                     err.to_string()
                                 );
                                 log::error!("{}", &error_message);
@@ -549,7 +556,7 @@ impl MachineManager for MachineManagerService {
         let request_info = SessionRequest::from(&request);
         let store_request = request.into_inner();
         log::info!(
-            "received session store request, session id='{}'",
+            "received session store request, session id={}",
             &store_request.session_id
         );
         let session_mut = self.find_session(&store_request.session_id).await?;
@@ -576,7 +583,7 @@ impl MachineManager for MachineManagerService {
         }
         MachineManagerService::clear_request(&mut session);
         log::info!(
-            "session id='{}' store request executed successfully",
+            "session id={} store request executed successfully",
             &store_request.session_id
         );
         Ok(Response::new(Void {}))
@@ -590,7 +597,7 @@ impl MachineManager for MachineManagerService {
         let request_info = SessionRequest::from(&request);
         let read_request = request.into_inner();
         log::info!(
-            "received read memory request, session id='{}', cycle: {}",
+            "received read memory request, session id={}, cycle: {}",
             &read_request.session_id,
             &read_request.cycle
         );
@@ -618,7 +625,7 @@ impl MachineManager for MachineManagerService {
                         };
                         MachineManagerService::clear_request(&mut session);
                         log::info!(
-                            "session id='{}' read memory request executed successfully",
+                            "session id={} read memory request executed successfully",
                             &read_request.session_id
                         );
                         Ok(Response::new(response))
@@ -626,7 +633,7 @@ impl MachineManager for MachineManagerService {
                     Err(err) => {
                         MachineManagerService::clear_request(&mut session);
                         let error_message = format!(
-                            "error executing session read memory for session id='{}'. Details:'{}'",
+                            "error executing session read memory for session id={}. Details:'{}'",
                             &session.get_id(),
                             err.to_string()
                         );
@@ -656,7 +663,7 @@ impl MachineManager for MachineManagerService {
         let request_info = SessionRequest::from(&request);
         let write_request = request.into_inner();
         log::info!(
-            "received session write memory request, session id='{}', cycle={}",
+            "received session write memory request, session id={}, cycle={}",
             &write_request.session_id,
             &write_request.cycle
         );
@@ -672,7 +679,7 @@ impl MachineManager for MachineManagerService {
                     Ok(()) => {
                         MachineManagerService::clear_request(&mut session);
                         log::info!(
-                            "Session id='{}' write memory request executed successfully",
+                            "session id={} write memory request executed successfully",
                             &write_request.session_id
                         );
                         Ok(Response::new(Void {}))
@@ -680,7 +687,8 @@ impl MachineManager for MachineManagerService {
                     Err(err) => {
                         MachineManagerService::clear_request(&mut session);
                         let error_message = format!(
-                            "Error executing session write memory for session id='{}'. Details:'{}'", &session.get_id(),
+                            "Error executing session write memory for session id={}. Details:'{}'",
+                            &session.get_id(),
                             err.to_string()
                         );
                         log::error!("{}", &error_message);
@@ -709,7 +717,7 @@ impl MachineManager for MachineManagerService {
         let request_info = SessionRequest::from(&request);
         let proof_request = request.into_inner();
         log::info!(
-            "received session get proof request, session id='{}', cycle={}",
+            "received session get proof request, session id={}, cycle={}",
             &proof_request.session_id,
             &proof_request.cycle
         );
@@ -726,7 +734,7 @@ impl MachineManager for MachineManagerService {
                     Ok(result) => {
                         MachineManagerService::clear_request(&mut session);
                         log::info!(
-                            "session id='{}' get proof request executed successfully",
+                            "session id={} get proof request executed successfully",
                             &proof_request.session_id
                         );
                         Ok(Response::new(MerkleTreeProof::from(&result)))
@@ -734,7 +742,7 @@ impl MachineManager for MachineManagerService {
                     Err(err) => {
                         MachineManagerService::clear_request(&mut session);
                         let error_message = &format!(
-                            "error executing session get proof for session id='{}'. Details:'{}'",
+                            "error executing session get proof for session id={}. Details:'{}'",
                             &session.get_id(),
                             err.to_string()
                         );
@@ -763,21 +771,21 @@ impl MachineManager for MachineManagerService {
     ) -> Result<Response<cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::Void>, Status> {
         let end_request = request.into_inner();
         log::info!(
-            "received end session request, session id='{}'",
+            "received end session request, session id={}",
             &end_request.session_id
         );
         let mut session_manager = self.session_manager.lock().await;
         match session_manager.close_session(&end_request.session_id).await {
             Ok(()) => {
                 log::info!(
-                    "end Session id='{}' request executed successfully",
+                    "end session id={} request executed successfully",
                     &end_request.session_id
                 );
                 Ok(Response::new(Void {}))
             }
             Err(err) => {
                 let error_message = format!(
-                    "Error ending session id='{}'. Details: '{}'",
+                    "Error ending session id={}. Details: '{}'",
                     &end_request.session_id,
                     err.to_string()
                 );

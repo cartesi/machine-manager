@@ -132,7 +132,9 @@ fn instantiate_local_server_instance(
     let address = format!("{}:{}", host, port);
     log::debug!(
         "instantiating remote Cartesi machine on address {}, session-id={}, checkin-address={}",
-        address, session_id, checkin_address
+        address,
+        session_id,
+        checkin_address
     );
     let cartesi_server_bin = format!("{}/remote-cartesi-machine", cartesi_bin_path);
     let output = std::process::Command::new(cartesi_server_bin)
