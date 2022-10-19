@@ -46,7 +46,7 @@ impl std::error::Error for CartesiServerManagerError {}
 
 /// Structure that represents Cartesi machine client targeting
 /// remote Cartesi machine server used in session
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CartesiSessionMachineClient {
     pub server_id: String,
     pub cartesi_machine_client: Option<GrpcCartesiMachineClient>,

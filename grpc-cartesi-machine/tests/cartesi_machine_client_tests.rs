@@ -25,13 +25,13 @@ use tonic::transport::Server;
 use tonic::{Request, Response};
 
 static INITIAL_ROOT_HASH: Hash = Hash([
-    171, 57, 119, 62, 75, 81, 39, 16, 236, 196, 74, 63, 99, 19, 28, 11, 180, 207, 215, 180, 228,
-    62, 112, 76, 5, 77, 7, 167, 105, 205, 122, 79,
+    47, 32, 212, 175, 68, 100, 144, 146, 54, 0, 182, 91, 46, 44, 4, 180, 130, 199, 222, 192, 66, 213,
+    196, 179, 196, 234, 147, 1, 120, 251, 245, 175
 ]);
 
 static SECOND_STEP_HASH: Hash = Hash([
-    87, 241, 30, 88, 202, 242, 149, 254, 136, 232, 94, 152, 182, 189, 0, 215, 216, 124, 2, 60, 46,
-    145, 164, 254, 219, 55, 206, 141, 175, 241, 218, 98,
+    220, 70, 176, 20, 7, 197, 92, 234, 179, 243, 7, 38, 152, 182, 146, 11, 84, 120, 224, 161, 172, 80, 
+    165, 119, 105, 27, 77, 205, 205, 81, 242, 30
 ]);
 
 #[allow(dead_code)]
@@ -191,6 +191,39 @@ mod local_server {
             length: 1 << 20,
             image_filename: String::new(),
         };
+        default_config.rollup = RollupConfig {
+            input_metadata: Some(MemoryRangeConfig {
+                start: 0x60400000,
+                length: 4096,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            notice_hashes: Some(MemoryRangeConfig {
+                start: 0x60800000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            rx_buffer: Some(MemoryRangeConfig {
+                start: 0x60000000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            voucher_hashes: Some(MemoryRangeConfig {
+                start: 0x60600000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            tx_buffer: Some(MemoryRangeConfig{
+                start: 0x60200000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+        };
+        
         match context
             .get_server()
             .create_machine(&default_config, &MachineRuntimeConfig::default())
@@ -247,6 +280,39 @@ mod local_server {
             length: 1 << 20,
             image_filename: String::new(),
         };
+        default_config.rollup = RollupConfig {
+            input_metadata: Some(MemoryRangeConfig {
+                start: 0x60400000,
+                length: 4096,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            notice_hashes: Some(MemoryRangeConfig {
+                start: 0x60800000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            rx_buffer: Some(MemoryRangeConfig {
+                start: 0x60000000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            voucher_hashes: Some(MemoryRangeConfig {
+                start: 0x60600000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            tx_buffer: Some(MemoryRangeConfig{
+                start: 0x60200000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+        };
+
         //Create flash image and add to flash configuration
         match std::fs::write("/tmp/input_root.raw", b"Root data in flash") {
             Ok(_) => (),
@@ -355,6 +421,7 @@ mod local_server {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .thread_name(&format!("Run jo"))
                 .enable_io()
+                .enable_time()
                 .thread_stack_size(1024 * 1024)
                 .build()
                 .unwrap();
@@ -411,6 +478,38 @@ mod local_server {
         default_config.ram = RamConfig {
             length: 1 << 20,
             image_filename: String::new(),
+        };
+        default_config.rollup = RollupConfig {
+            input_metadata: Some(MemoryRangeConfig {
+                start: 0x60400000,
+                length: 4096,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            notice_hashes: Some(MemoryRangeConfig {
+                start: 0x60800000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            rx_buffer: Some(MemoryRangeConfig {
+                start: 0x60000000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            voucher_hashes: Some(MemoryRangeConfig {
+                start: 0x60600000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            tx_buffer: Some(MemoryRangeConfig{
+                start: 0x60200000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
         };
         match context
             .get_server()
@@ -475,7 +574,7 @@ mod local_server {
             semantic_version,
             SemanticVersion {
                 major: 0,
-                minor: 5,
+                minor: 6,
                 patch: 0,
                 pre_release: "".to_string(),
                 build: "".to_string()
@@ -494,14 +593,14 @@ mod local_server {
         println!("Acquired default config {:?}", default_config);
         assert_eq!(default_config.processor.pc, 4096);
         assert_eq!(default_config.processor.mvendorid, 7161130726739634464);
-        assert_eq!(default_config.processor.marchid, 9);
+        assert_eq!(default_config.processor.marchid, 0xc);
         assert_eq!(default_config.ram.length, 0);
         assert_eq!(default_config.rom.image_filename, "");
         assert_eq!(default_config.flash_drives.len(), 0);
-        assert_eq!(default_config.htif.fromhost, 0);
-        assert_eq!(default_config.htif.tohost, 0);
+        assert_eq!(default_config.htif.fromhost, Some(0));
+        assert_eq!(default_config.htif.tohost, Some(0));
         assert_eq!(default_config.dhd.dlength, 0);
-        assert_eq!(default_config.clint.mtimecmp, 0);
+        assert_eq!(default_config.clint.mtimecmp, Some(0));
         Ok(())
     }
 
@@ -520,6 +619,39 @@ mod local_server {
             length: 1 << 20,
             image_filename: String::new(),
         };
+        default_config.rollup = RollupConfig {
+            input_metadata: Some(MemoryRangeConfig {
+                start: 0x60400000,
+                length: 4096,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            notice_hashes: Some(MemoryRangeConfig {
+                start: 0x60800000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            rx_buffer: Some(MemoryRangeConfig {
+                start: 0x60000000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            voucher_hashes: Some(MemoryRangeConfig {
+                start: 0x60600000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            tx_buffer: Some(MemoryRangeConfig{
+                start: 0x60200000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+        };
+
         context
             .get_server()
             .create_machine(&default_config, &MachineRuntimeConfig::default())
@@ -541,6 +673,38 @@ mod local_server {
         default_config.ram = RamConfig {
             length: 1 << 20,
             image_filename: String::new(),
+        };
+        default_config.rollup = RollupConfig {
+            input_metadata: Some(MemoryRangeConfig {
+                start: 0x60400000,
+                length: 4096,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            notice_hashes: Some(MemoryRangeConfig {
+                start: 0x60800000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            rx_buffer: Some(MemoryRangeConfig {
+                start: 0x60000000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            voucher_hashes: Some(MemoryRangeConfig {
+                start: 0x60600000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
+            tx_buffer: Some(MemoryRangeConfig{
+                start: 0x60200000,
+                length: 2 << 20,
+                image_filename: "".to_string(),
+                shared: false,
+            }),
         };
         let ret = context
             .get_server()
@@ -775,9 +939,7 @@ mod local_server {
         assert_eq!(proof.log2_target_size, 10);
         assert_eq!(
             proof.target_hash,
-            Hash([
-                190, 202, 43, 74, 46, 123, 22, 69, 193, 136, 9, 144, 96, 180, 233, 7, 36, 184, 154,
-                226, 168, 75, 72, 242, 83, 134, 219, 40, 64, 110, 201, 10
+            Hash([152, 225, 191, 1, 159, 15, 23, 183, 105, 220, 134, 243, 247, 25, 127, 127, 62, 243, 172, 236, 65, 71, 52, 196, 6, 23, 40, 172, 12, 72, 88, 150
             ])
         );
         assert_eq!(proof.sibling_hashes.len(), 54);
@@ -786,7 +948,7 @@ mod local_server {
 
     #[rstest]
     #[tokio::test]
-    async fn test_replace_flash_drive(
+    async fn test_replace_memory_range(
         context_with_machine_with_flash_future: impl Future<Output = Context>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut context = context_with_machine_with_flash_future.await;
@@ -915,17 +1077,17 @@ mod local_server {
         println!("Acquired initial config {:?}", initial_config);
         assert_eq!(initial_config.processor.pc, 4096);
         assert_eq!(initial_config.processor.mvendorid, 7161130726739634464);
-        assert_eq!(initial_config.processor.marchid, 9);
+        assert_eq!(initial_config.processor.marchid, 0xc);
         assert_eq!(initial_config.ram.length, 1048576);
         assert_eq!(
             initial_config.rom.image_filename,
             "/opt/cartesi/share/images/rom.bin"
         );
         assert_eq!(initial_config.flash_drives.len(), 0);
-        assert_eq!(initial_config.htif.fromhost, 0);
-        assert_eq!(initial_config.htif.tohost, 0);
+        assert_eq!(initial_config.htif.fromhost, Some(0));
+        assert_eq!(initial_config.htif.tohost, Some(0));
         assert_eq!(initial_config.dhd.dlength, 0);
-        assert_eq!(initial_config.clint.mtimecmp, 0);
+        assert_eq!(initial_config.clint.mtimecmp, Some(0));
         Ok(())
     }
 
@@ -935,20 +1097,7 @@ mod local_server {
         context_with_machine_future: impl Future<Output = Context>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut context = context_with_machine_future.await;
-        let ret = context.get_server().update_merkle_tree().await?;
-        assert!(ret);
         let ret = context.get_server().verify_merkle_tree().await?;
-        assert!(ret);
-        Ok(())
-    }
-
-    #[rstest]
-    #[tokio::test]
-    async fn test_update_merkle_tree(
-        context_with_machine_future: impl Future<Output = Context>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut context = context_with_machine_future.await;
-        let ret = context.get_server().update_merkle_tree().await?;
         assert!(ret);
         Ok(())
     }
@@ -991,7 +1140,6 @@ mod local_server {
         context_with_machine_future: impl Future<Output = Context>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut context = context_with_machine_future.await;
-        context.get_server().update_merkle_tree().await?;
         let log = context
             .get_server()
             .step(
@@ -1015,7 +1163,6 @@ mod local_server {
         context_with_machine_future: impl Future<Output = Context>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut context = context_with_machine_future.await;
-        context.get_server().update_merkle_tree().await?;
         let root_hash_before = context.get_server().get_root_hash().await?;
         let log = context
             .get_server()

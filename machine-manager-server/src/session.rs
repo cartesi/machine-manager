@@ -20,7 +20,7 @@ use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::{Csr, RunResponse};
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::SessionRunProgress;
 use generic_array::GenericArray;
 use grpc_cartesi_machine::{
-    GrpcCartesiMachineClient, MachineConfig, MachineRuntimeConfig, MerkleTreeProof,
+    GrpcCartesiMachineClient, MachineConfig, MachineRuntimeConfig, MerkleTreeProof, MemoryRangeConfig
 };
 use sha3::{Digest, Sha3_256};
 use std::fmt::Debug;
@@ -30,6 +30,7 @@ pub const WAIT_SLEEP_STEP: u64 = 100; //ms
 pub const WAIT_RETRIES_NUMBER: u64 = 200; // in total wait for check in 20s
 const RUN_STEP: u64 = 10_000_000; //Number of running cycles to run with one call to Cartesi emulator
 const RUN_STEPS_AT_ONCE: i32 = 10; //Number of steps to run at once in batch
+const MAX_CYCLE: u64 = 15;
 
 #[derive(Debug, Default)]
 /// Error type returned from session functions
@@ -190,6 +191,10 @@ pub struct Session {
 impl Session {
     /// Instantiate server using server manager and set Cartesi
     /// session client handle
+    
+    pub fn cartesi_session_client (&self) -> CartesiSessionMachineClient{
+        self.cartesi_session_client.clone()
+    }
     pub async fn setup_session_cartesi_server(
         &mut self,
         checkin_address: &str,
@@ -223,6 +228,10 @@ impl Session {
     /// Retrieve session id
     pub fn get_id(&self) -> &str {
         &self.id
+    }
+
+    pub fn get_server_manager(&self) -> &Arc<Mutex<dyn ServerManager>> {
+        &self.server_manager
     }
 
     /// Check if there is an active Cartesi machine client connection to
@@ -479,6 +488,7 @@ impl Session {
         }
     }
 
+
     /// Perform snapshot of machine instance on remote Cartesi machine emulator server
     /// On Cartesi machine server snapshot is implemented by forking process, and
     /// child process uses different port for communication. Waiting for check in
@@ -698,6 +708,7 @@ impl Session {
                         let runtime = tokio::runtime::Builder::new_current_thread()
                             .thread_name(&format!("Run job {}", &run_task_id))
                             .thread_stack_size(1024 * 1024)
+                            .enable_time()
                             .build()
                             .unwrap();
                         // Run blocking async task in this dedicated OS thread
@@ -715,7 +726,7 @@ impl Session {
                                 panic!("aborting function task id {id} due to cancellation request", id=task_id);
                             };
                             // Actually perform work here
-                            for cycle in task_final_cycles {
+                            for cycle in task_final_cycles.clone() {
                                 {
                                     let mut task_session = task_session_mut.lock().await;
                                     //Check if we need to abort
@@ -751,6 +762,12 @@ impl Session {
                                             };
                                             if is_halted {
                                                 current_task.progress.halted = true;
+                                                if &task_final_cycles.len() > &current_task.hashes.len() {
+                                                    let last_hash = current_task.hashes.get(current_task.hashes.len()-1).unwrap().clone();
+                                                    for _ in 1..&task_final_cycles.len() - current_task.hashes.len() {
+                                                        current_task.hashes.push(last_hash.clone());
+                                                    }
+                                                }
                                                 log::debug!(
                                                     "running task id {} progress: {}, session_id {}, curent cycle {} machine HALTED",
                                                     &current_task.id,
@@ -803,6 +820,84 @@ impl Session {
             updated_at: execution_progress.updated_at,
             application_progress: execution_progress.application_progress,
         })
+    }
+
+    pub async fn run_defective(
+        session_mut: Arc<Mutex<Session>>,
+        request_id: &str,
+        final_cycles: &[u64],
+    ) -> Result<SessionRunProgress, Box<dyn std::error::Error>> {
+
+        let mut modified_cycles: Vec<u64> = Vec::new();
+        for cycle in final_cycles {
+            if cycle >= &MAX_CYCLE {
+                modified_cycles.push(MAX_CYCLE);
+            }
+            else {
+                modified_cycles.push(*cycle);
+            }
+        }
+        
+        log::info!(
+            "Executing defective step.  Desired cycle: {:?}   Used cycle: {:?}",
+            modified_cycles, final_cycles
+        );
+
+        let session_run_result = Session::run(session_mut.clone(), request_id, &modified_cycles);
+        
+        log::debug!(
+            "Finished executing defective step.  Desired cycle: {:?}   Used cycle: {:?}",
+            modified_cycles, final_cycles
+        );
+        
+        match session_run_result.await{
+            Ok(session_result) => {
+                
+                let session_result = SessionRunProgress {
+                    progress: session_result.progress,
+                    application_progress: session_result.application_progress,
+                    updated_at: session_result.updated_at,
+                    cycle: final_cycles[0],
+                };
+
+                log::debug!(
+                    "Final response is: {:?}",
+                    session_result
+                );
+                Ok(session_result)
+            },
+            Err(e) => {
+                Err(e)
+            }
+        }
+        
+    }
+
+    pub async fn step_defective(
+        &mut self,
+        cycle: u64,
+        log_type: &grpc_cartesi_machine::AccessLogType,
+        one_based: bool,
+    ) -> Result<grpc_cartesi_machine::AccessLog, Box<dyn std::error::Error>> {
+        let mut modified_cycle = cycle;
+
+        if modified_cycle >= MAX_CYCLE {
+            modified_cycle = MAX_CYCLE
+        }
+
+        log::debug!(
+            "Executing defective step.  Desired cycle: {}   Used cycle: {}",
+            modified_cycle, cycle
+        );
+
+        let session_step_result = self.step(modified_cycle, log_type, one_based);  
+        
+        log::debug!(
+            "Finished executing defective step.  Desired cycle: {}   Used cycle: {}",
+            modified_cycle, cycle
+        );
+
+        session_step_result.await
     }
 
     /// Perform step of machine instance on remote Cartesi machine emulator server
@@ -877,6 +972,23 @@ impl Session {
         Ok(())
     }
 
+    // Replace memory range on machine instance on remote Cartesi machine emulator server
+    pub async fn replace_memory_range(
+        &mut self,
+        cycle: u64,
+        range: &cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::MemoryRangeConfig,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if self.cycle != cycle {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "unexpected session cycle, current cycle is {}",
+                self.cycle
+            ))));
+        }
+        let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
+        grpc_cartesi_machine.replace_memory_range(range).await?;
+        Ok(())
+    }
+
     /// Get requested proof of machine instance on remote Cartesi machine emulator server
     pub async fn get_proof(
         &mut self,
@@ -909,3 +1021,4 @@ impl Session {
         Ok(())
     }
 }
+

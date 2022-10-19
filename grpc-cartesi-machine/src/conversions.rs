@@ -10,8 +10,6 @@
 // specific language governing permissions and limitations under the License.
 
 use cartesi_grpc_interfaces::grpc_stubs;
-use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::processor_config::*;
-use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::*;
 
 impl From<&crate::MachineRuntimeConfig> for grpc_stubs::cartesi_machine::MachineRuntimeConfig {
     fn from(config: &crate::MachineRuntimeConfig) -> Self {
@@ -111,132 +109,42 @@ pub fn convert_x_csr_field(
     config: &grpc_stubs::cartesi_machine::ProcessorConfig,
 ) -> [u64; 32usize] {
     let mut result: [u64; 32usize] = [0; 32usize];
-    result[0] = config.x1_oneof.as_ref().unwrap_or(&X1Oneof::X1(0)).into();
-    result[1] = config.x2_oneof.as_ref().unwrap_or(&X2Oneof::X2(0)).into();
-    result[2] = config.x3_oneof.as_ref().unwrap_or(&X3Oneof::X3(0)).into();
-    result[3] = config.x4_oneof.as_ref().unwrap_or(&X4Oneof::X4(0)).into();
-    result[4] = config.x5_oneof.as_ref().unwrap_or(&X5Oneof::X5(0)).into();
-    result[5] = config.x6_oneof.as_ref().unwrap_or(&X6Oneof::X6(0)).into();
-    result[6] = config.x7_oneof.as_ref().unwrap_or(&X7Oneof::X7(0)).into();
-    result[7] = config.x8_oneof.as_ref().unwrap_or(&X8Oneof::X8(0)).into();
-    result[8] = config.x9_oneof.as_ref().unwrap_or(&X9Oneof::X9(0)).into();
-    result[9] = config
-        .x10_oneof
-        .as_ref()
-        .unwrap_or(&X10Oneof::X10(0))
-        .into();
-    result[10] = config
-        .x11_oneof
-        .as_ref()
-        .unwrap_or(&X11Oneof::X11(0))
-        .into();
-    result[11] = config
-        .x12_oneof
-        .as_ref()
-        .unwrap_or(&X12Oneof::X12(0))
-        .into();
-    result[12] = config
-        .x13_oneof
-        .as_ref()
-        .unwrap_or(&X13Oneof::X13(0))
-        .into();
-    result[13] = config
-        .x14_oneof
-        .as_ref()
-        .unwrap_or(&X14Oneof::X14(0))
-        .into();
-    result[14] = config
-        .x15_oneof
-        .as_ref()
-        .unwrap_or(&X15Oneof::X15(0))
-        .into();
-    result[15] = config
-        .x16_oneof
-        .as_ref()
-        .unwrap_or(&X16Oneof::X16(0))
-        .into();
-    result[16] = config
-        .x17_oneof
-        .as_ref()
-        .unwrap_or(&X17Oneof::X17(0))
-        .into();
-    result[17] = config
-        .x18_oneof
-        .as_ref()
-        .unwrap_or(&X18Oneof::X18(0))
-        .into();
-    result[18] = config
-        .x19_oneof
-        .as_ref()
-        .unwrap_or(&X19Oneof::X19(0))
-        .into();
-    result[19] = config
-        .x20_oneof
-        .as_ref()
-        .unwrap_or(&X20Oneof::X20(0))
-        .into();
-    result[20] = config
-        .x21_oneof
-        .as_ref()
-        .unwrap_or(&X21Oneof::X21(0))
-        .into();
-    result[21] = config
-        .x22_oneof
-        .as_ref()
-        .unwrap_or(&X22Oneof::X22(0))
-        .into();
-    result[22] = config
-        .x23_oneof
-        .as_ref()
-        .unwrap_or(&X23Oneof::X23(0))
-        .into();
-    result[23] = config
-        .x24_oneof
-        .as_ref()
-        .unwrap_or(&X24Oneof::X24(0))
-        .into();
-    result[24] = config
-        .x25_oneof
-        .as_ref()
-        .unwrap_or(&X25Oneof::X25(0))
-        .into();
-    result[25] = config
-        .x26_oneof
-        .as_ref()
-        .unwrap_or(&X26Oneof::X26(0))
-        .into();
-    result[26] = config
-        .x27_oneof
-        .as_ref()
-        .unwrap_or(&X27Oneof::X27(0))
-        .into();
-    result[27] = config
-        .x28_oneof
-        .as_ref()
-        .unwrap_or(&X28Oneof::X28(0))
-        .into();
-    result[28] = config
-        .x29_oneof
-        .as_ref()
-        .unwrap_or(&X29Oneof::X29(0))
-        .into();
-    result[29] = config
-        .x30_oneof
-        .as_ref()
-        .unwrap_or(&X30Oneof::X30(0))
-        .into();
-    result[30] = config
-        .x31_oneof
-        .as_ref()
-        .unwrap_or(&X31Oneof::X31(0))
-        .into();
+    result[0] = convert_csr_field(config.x1);
+    result[1] = convert_csr_field(config.x2);
+    result[2] = convert_csr_field(config.x3);
+    result[3] = convert_csr_field(config.x4);
+    result[4] = convert_csr_field(config.x5);
+    result[5] = convert_csr_field(config.x6);
+    result[6] = convert_csr_field(config.x7);
+    result[7] = convert_csr_field(config.x8);
+    result[8] = convert_csr_field(config.x9);
+    result[9] = convert_csr_field(config.x10);
+    result[10] = convert_csr_field(config.x11);
+    result[11] = convert_csr_field(config.x12);
+    result[12] = convert_csr_field(config.x13);
+    result[13] = convert_csr_field(config.x14);
+    result[14] = convert_csr_field(config.x15);
+    result[15] = convert_csr_field(config.x16);
+    result[16] = convert_csr_field(config.x17);
+    result[17] = convert_csr_field(config.x18);
+    result[18] = convert_csr_field(config.x19);
+    result[19] = convert_csr_field(config.x20);
+    result[20] = convert_csr_field(config.x21);
+    result[21] = convert_csr_field(config.x22);
+    result[22] = convert_csr_field(config.x23);
+    result[23] = convert_csr_field(config.x24);
+    result[24] = convert_csr_field(config.x25);
+    result[25] = convert_csr_field(config.x26);
+    result[26] = convert_csr_field(config.x27);
+    result[27] = convert_csr_field(config.x28);
+    result[28] = convert_csr_field(config.x29);
+    result[29] = convert_csr_field(config.x30);
+    result[30] = convert_csr_field(config.x31);
     result
 }
 
-pub fn convert_csr_field<'a, T>(field: &'a ::core::option::Option<T>) -> u64
+pub fn convert_csr_field(field: ::core::option::Option<u64>) -> u64
 where
-    T: 'a,
-    u64: From<&'a T>,
 {
     match field {
         Some(x) => u64::from(x),
@@ -247,70 +155,64 @@ where
 impl From<&crate::ProcessorConfig> for grpc_stubs::cartesi_machine::ProcessorConfig {
     fn from(config: &crate::ProcessorConfig) -> Self {
         grpc_stubs::cartesi_machine::ProcessorConfig {
-            x1_oneof: Some(processor_config::X1Oneof::X1(config.x[0])),
-            x2_oneof: Some(processor_config::X2Oneof::X2(config.x[1])),
-            x3_oneof: Some(processor_config::X3Oneof::X3(config.x[2])),
-            x4_oneof: Some(processor_config::X4Oneof::X4(config.x[3])),
-            x5_oneof: Some(processor_config::X5Oneof::X5(config.x[4])),
-            x6_oneof: Some(processor_config::X6Oneof::X6(config.x[5])),
-            x7_oneof: Some(processor_config::X7Oneof::X7(config.x[6])),
-            x8_oneof: Some(processor_config::X8Oneof::X8(config.x[7])),
-            x9_oneof: Some(processor_config::X9Oneof::X9(config.x[8])),
-            x10_oneof: Some(processor_config::X10Oneof::X10(config.x[9])),
-            x11_oneof: Some(processor_config::X11Oneof::X11(config.x[10])),
-            x12_oneof: Some(processor_config::X12Oneof::X12(config.x[11])),
-            x13_oneof: Some(processor_config::X13Oneof::X13(config.x[12])),
-            x14_oneof: Some(processor_config::X14Oneof::X14(config.x[13])),
-            x15_oneof: Some(processor_config::X15Oneof::X15(config.x[14])),
-            x16_oneof: Some(processor_config::X16Oneof::X16(config.x[15])),
-            x17_oneof: Some(processor_config::X17Oneof::X17(config.x[16])),
-            x18_oneof: Some(processor_config::X18Oneof::X18(config.x[17])),
-            x19_oneof: Some(processor_config::X19Oneof::X19(config.x[18])),
-            x20_oneof: Some(processor_config::X20Oneof::X20(config.x[19])),
-            x21_oneof: Some(processor_config::X21Oneof::X21(config.x[20])),
-            x22_oneof: Some(processor_config::X22Oneof::X22(config.x[21])),
-            x23_oneof: Some(processor_config::X23Oneof::X23(config.x[22])),
-            x24_oneof: Some(processor_config::X24Oneof::X24(config.x[23])),
-            x25_oneof: Some(processor_config::X25Oneof::X25(config.x[24])),
-            x26_oneof: Some(processor_config::X26Oneof::X26(config.x[25])),
-            x27_oneof: Some(processor_config::X27Oneof::X27(config.x[26])),
-            x28_oneof: Some(processor_config::X28Oneof::X28(config.x[27])),
-            x29_oneof: Some(processor_config::X29Oneof::X29(config.x[28])),
-            x30_oneof: Some(processor_config::X30Oneof::X30(config.x[29])),
-            x31_oneof: Some(processor_config::X31Oneof::X31(config.x[30])),
-            pc_oneof: Some(processor_config::PcOneof::Pc(config.pc)),
-            mvendorid_oneof: Some(processor_config::MvendoridOneof::Mvendorid(
-                config.mvendorid,
-            )),
-            marchid_oneof: Some(processor_config::MarchidOneof::Marchid(config.marchid)),
-            mimpid_oneof: Some(processor_config::MimpidOneof::Mimpid(config.mimpid)),
-            mcycle_oneof: Some(processor_config::McycleOneof::Mcycle(config.mcycle)),
-            minstret_oneof: Some(processor_config::MinstretOneof::Minstret(config.minstret)),
-            mstatus_oneof: Some(processor_config::MstatusOneof::Mstatus(config.mstatus)),
-            mtvec_oneof: Some(processor_config::MtvecOneof::Mtvec(config.mtvec)),
-            mscratch_oneof: Some(processor_config::MscratchOneof::Mscratch(config.mscratch)),
-            mepc_oneof: Some(processor_config::MepcOneof::Mepc(config.mepc)),
-            mcause_oneof: Some(processor_config::McauseOneof::Mcause(config.mcause)),
-            mtval_oneof: Some(processor_config::MtvalOneof::Mtval(config.mtval)),
-            misa_oneof: Some(processor_config::MisaOneof::Misa(config.misa)),
-            mie_oneof: Some(processor_config::MieOneof::Mie(config.mie)),
-            mip_oneof: Some(processor_config::MipOneof::Mip(config.mip)),
-            medeleg_oneof: Some(processor_config::MedelegOneof::Medeleg(config.medeleg)),
-            mideleg_oneof: Some(processor_config::MidelegOneof::Mideleg(config.mideleg)),
-            mcounteren_oneof: Some(processor_config::McounterenOneof::Mcounteren(
-                config.mcounteren,
-            )),
-            stvec_oneof: Some(processor_config::StvecOneof::Stvec(config.stvec)),
-            sscratch_oneof: Some(processor_config::SscratchOneof::Sscratch(config.sscratch)),
-            sepc_oneof: Some(processor_config::SepcOneof::Sepc(config.sepc)),
-            scause_oneof: Some(processor_config::ScauseOneof::Scause(config.scause)),
-            stval_oneof: Some(processor_config::StvalOneof::Stval(config.stval)),
-            satp_oneof: Some(processor_config::SatpOneof::Satp(config.satp)),
-            scounteren_oneof: Some(processor_config::ScounterenOneof::Scounteren(
-                config.scounteren,
-            )),
-            ilrsc_oneof: Some(processor_config::IlrscOneof::Ilrsc(config.ilrsc)),
-            iflags_oneof: Some(processor_config::IflagsOneof::Iflags(config.iflags)),
+            x1: Some(config.x[0]),
+            x2: Some(config.x[1]),
+            x3: Some(config.x[2]),
+            x4: Some(config.x[3]),
+            x5: Some(config.x[4]),
+            x6: Some(config.x[5]),
+            x7: Some(config.x[6]),
+            x8: Some(config.x[7]),
+            x9: Some(config.x[8]),
+            x10: Some(config.x[9]),
+            x11: Some(config.x[10]),
+            x12: Some(config.x[11]),
+            x13: Some(config.x[12]),
+            x14: Some(config.x[13]),
+            x15: Some(config.x[14]),
+            x16: Some(config.x[15]),
+            x17: Some(config.x[16]),
+            x18: Some(config.x[17]),
+            x19: Some(config.x[18]),
+            x20: Some(config.x[19]),
+            x21: Some(config.x[20]),
+            x22: Some(config.x[21]),
+            x23: Some(config.x[22]),
+            x24: Some(config.x[23]),
+            x25: Some(config.x[24]),
+            x26: Some(config.x[25]),
+            x27: Some(config.x[26]),
+            x28: Some(config.x[27]),
+            x29: Some(config.x[28]),
+            x30: Some(config.x[29]),
+            x31: Some(config.x[30]),
+            pc: Some(config.pc),
+            mvendorid: Some(config.mvendorid),
+            marchid: Some(config.marchid),
+            mimpid: Some(config.mimpid),
+            mcycle: Some(config.mcycle),
+            minstret: Some(config.minstret),
+            mstatus: Some(config.mstatus),
+            mtvec: Some(config.mtvec),
+            mscratch: Some(config.mscratch),
+            mepc: Some(config.mepc),
+            mcause: Some(config.mcause),
+            mtval: Some(config.mtval),
+            misa: Some(config.misa),
+            mie: Some(config.mie),
+            mip: Some(config.mip),
+            medeleg: Some(config.medeleg),
+            mideleg: Some(config.mideleg),
+            mcounteren: Some(config.mcounteren),
+            stvec: Some(config.stvec),
+            sscratch: Some(config.sscratch),
+            sepc: Some(config.sepc),
+            scause: Some(config.scause),
+            stval: Some(config.stval),
+            satp: Some(config.satp),
+            scounteren: Some(config.scounteren),
+            ilrsc: Some(config.ilrsc),
+            iflags: Some(config.iflags)
         }
     }
 }
@@ -357,32 +259,6 @@ impl From<&crate::DhdConfig> for grpc_stubs::cartesi_machine::DhdConfig {
     }
 }
 
-impl From<&crate::ClintConfig> for grpc_stubs::cartesi_machine::ClintConfig {
-    fn from(config: &crate::ClintConfig) -> Self {
-        grpc_stubs::cartesi_machine::ClintConfig {
-            mtimecmp_oneof: Some(
-                grpc_stubs::cartesi_machine::clint_config::MtimecmpOneof::Mtimecmp(config.mtimecmp),
-            ),
-        }
-    }
-}
-
-impl From<&crate::HtifConfig> for grpc_stubs::cartesi_machine::HtifConfig {
-    fn from(config: &crate::HtifConfig) -> Self {
-        grpc_stubs::cartesi_machine::HtifConfig {
-            console_getchar: config.console_getchar,
-            yield_manual: config.yield_manual,
-            yield_automatic: config.yield_automatic,
-            fromhost_oneof: Some(
-                grpc_stubs::cartesi_machine::htif_config::FromhostOneof::Fromhost(config.fromhost),
-            ),
-            tohost_oneof: Some(
-                grpc_stubs::cartesi_machine::htif_config::TohostOneof::Tohost(config.fromhost),
-            ),
-        }
-    }
-}
-
 impl From<&crate::RollupConfig> for grpc_stubs::cartesi_machine::RollupConfig {
     fn from(config: &crate::RollupConfig) -> Self {
         grpc_stubs::cartesi_machine::RollupConfig {
@@ -424,9 +300,9 @@ impl From<&crate::MachineConfig> for grpc_stubs::cartesi_machine::MachineConfig 
                 .map(grpc_stubs::cartesi_machine::MemoryRangeConfig::from)
                 .collect(),
             clint: Some(grpc_stubs::cartesi_machine::ClintConfig::from(
-                &config.clint,
+                config.clint.clone(),
             )),
-            htif: Some(grpc_stubs::cartesi_machine::HtifConfig::from(&config.htif)),
+            htif: Some(grpc_stubs::cartesi_machine::HtifConfig::from(config.htif.clone())),
             dhd: Some(grpc_stubs::cartesi_machine::DhdConfig::from(&config.dhd)),
             rollup: Some(grpc_stubs::cartesi_machine::RollupConfig::from(
                 &config.rollup,

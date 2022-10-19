@@ -11,11 +11,11 @@ path = "src/main.rs"
 
 [dependencies]
 cartesi-grpc-interfaces = { path = "../../cartesi-grpc-interfaces" }
-tonic = "0.5"
-prost = "0.8"
+tonic = "0.8.2"
+prost = "0.11"
 async-trait = "0.1.42"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"]}
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "time"]}
 
 
 [build-dependencies]
-tonic-build = "0.5"
+tonic-build = "0.8.2"

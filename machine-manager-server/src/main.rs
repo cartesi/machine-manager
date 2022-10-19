@@ -12,6 +12,8 @@
 extern crate cartesi_grpc_interfaces;
 extern crate getopts;
 extern crate machine_manager_server;
+pub mod defective_session_registry;
+use crate::defective_session_registry::MachineManagerServiceDefective;
 
 use getopts::Options;
 use std::env;
@@ -19,7 +21,6 @@ use std::env;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::machine_manager_server::MachineManagerServer;
 
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::machine_check_in_server::MachineCheckInServer;
-
 use machine_manager_server::{MachineManagerService, ManagerCheckinService};
 
 use async_mutex::Mutex;
@@ -53,16 +54,38 @@ async fn run_checkin_service(
 async fn run_machine_manager_service(
     addr_checkin: std::net::SocketAddr,
     session_manager: Arc<Mutex<dyn SessionManager>>,
+    defective: bool
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let machine_manager_service = MachineManagerService::new(session_manager);
-    match Server::builder()
+    if defective {
+        let machine_manager_service = MachineManagerService::new(session_manager.clone());
+        let mut machine_manager_service = MachineManagerServiceDefective::new(machine_manager_service);
+        machine_manager_service.machine_manager_service.shutting_down = true;
+        session_manager.lock().await.closing_all_sessions();
+        log::info!(
+            "Machine is running in defective mode",
+        );
+
+        match Server::builder()
         .add_service(MachineManagerServer::new(machine_manager_service))
         .serve(addr_checkin)
         .await
-    {
-        Ok(_x) => Ok(()),
-        Err(x) => Err(Box::new(x)),
+        {
+            Ok(_x) => Ok(()),
+            Err(x) => Err(Box::new(x)),
+        }
     }
+    else {
+        let machine_manager_service = MachineManagerService::new(session_manager);
+        match Server::builder()
+        .add_service(MachineManagerServer::new(machine_manager_service))
+        .serve(addr_checkin)
+        .await
+        {
+            Ok(_x) => Ok(()),
+            Err(x) => Err(Box::new(x)),
+        }
+}
+   
 }
 
 #[tokio::main]
@@ -79,6 +102,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         "Port to listen for cartesi server manager checkin (default: 50052)",
         "",
     );
+    opts.optopt("d", "defective", "defective", "");
     opts.optflag("", "verbose", "print more info about application execution");
     opts.optflag("h", "help", "show this help message and exit");
     let matches = opts.parse(&args[1..])?;
@@ -89,6 +113,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let host = matches.opt_get_default("address", "127.0.0.1".to_string())?;
     let port = matches.opt_get_default("port", 50051)?;
     let port_checkin = matches.opt_get_default("port-checkin", 50052)?;
+    let defective = matches.opt_get_default("defective", false)?;
     let addr_checkin = format!("{}:{}", host, port_checkin).parse()?;
 
     // Set the global log level
@@ -129,12 +154,14 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let session_manager: Arc<Mutex<dyn SessionManager>> = Arc::new(Mutex::new(
         RamSessionManager::new(format!("{}:{}", host, port_checkin), &server_manager),
     ));
+
     //Run check in service and machine manager service
     match tokio::try_join!(
         run_checkin_service(addr_checkin, Arc::clone(&server_manager)),
-        run_machine_manager_service(addr_machine_manager, Arc::clone(&session_manager))
+        run_machine_manager_service(addr_machine_manager, Arc::clone(&session_manager), defective)
     ) {
         Ok(_x) => Ok(()),
         Err(err) => Err(err),
     }
+
 }

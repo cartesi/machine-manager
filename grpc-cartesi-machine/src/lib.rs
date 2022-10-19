@@ -19,10 +19,8 @@ use std::convert::TryInto;
 use std::fmt;
 
 use cartesi_grpc_interfaces::grpc_stubs;
-use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::clint_config::MtimecmpOneof;
-use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::htif_config::{
-    FromhostOneof, TohostOneof,
-};
+use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::ClintConfig;
+use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::HtifConfig;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::machine_client::MachineClient;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::*;
 use conversions::*;
@@ -167,33 +165,33 @@ impl From<&grpc_stubs::cartesi_machine::ProcessorConfig> for ProcessorConfig {
     fn from(config: &grpc_stubs::cartesi_machine::ProcessorConfig) -> Self {
         ProcessorConfig {
             x: convert_x_csr_field(config),
-            pc: convert_csr_field(&config.pc_oneof),
-            mvendorid: convert_csr_field(&config.mvendorid_oneof),
-            marchid: convert_csr_field(&config.marchid_oneof),
-            mimpid: convert_csr_field(&config.mimpid_oneof),
-            mcycle: convert_csr_field(&config.mcycle_oneof),
-            minstret: convert_csr_field(&config.minstret_oneof),
-            mstatus: convert_csr_field(&config.mstatus_oneof),
-            mtvec: convert_csr_field(&config.mtvec_oneof),
-            mscratch: convert_csr_field(&config.mscratch_oneof),
-            mepc: convert_csr_field(&config.mepc_oneof),
-            mcause: convert_csr_field(&config.mcause_oneof),
-            mtval: convert_csr_field(&config.mtval_oneof),
-            misa: convert_csr_field(&config.misa_oneof),
-            mie: convert_csr_field(&config.mie_oneof),
-            mip: convert_csr_field(&config.mip_oneof),
-            medeleg: convert_csr_field(&config.medeleg_oneof),
-            mideleg: convert_csr_field(&config.mideleg_oneof),
-            mcounteren: convert_csr_field(&config.mcounteren_oneof),
-            stvec: convert_csr_field(&config.stvec_oneof),
-            sscratch: convert_csr_field(&config.sscratch_oneof),
-            sepc: convert_csr_field(&config.sepc_oneof),
-            scause: convert_csr_field(&config.scause_oneof),
-            stval: convert_csr_field(&config.stval_oneof),
-            satp: convert_csr_field(&config.satp_oneof),
-            scounteren: convert_csr_field(&config.scounteren_oneof),
-            ilrsc: convert_csr_field(&config.ilrsc_oneof),
-            iflags: convert_csr_field(&config.iflags_oneof),
+            pc: convert_csr_field(config.pc),
+            mvendorid: convert_csr_field(config.mvendorid),
+            marchid: convert_csr_field(config.marchid),
+            mimpid: convert_csr_field(config.mimpid),
+            mcycle: convert_csr_field(config.mcycle),
+            minstret: convert_csr_field(config.minstret),
+            mstatus: convert_csr_field(config.mstatus),
+            mtvec: convert_csr_field(config.mtvec),
+            mscratch: convert_csr_field(config.mscratch),
+            mepc: convert_csr_field(config.mepc),
+            mcause: convert_csr_field(config.mcause),
+            mtval: convert_csr_field(config.mtval),
+            misa: convert_csr_field(config.misa),
+            mie: convert_csr_field(config.mie),
+            mip: convert_csr_field(config.mip),
+            medeleg: convert_csr_field(config.medeleg),
+            mideleg: convert_csr_field(config.mideleg),
+            mcounteren: convert_csr_field(config.mcounteren),
+            stvec: convert_csr_field(config.stvec),
+            sscratch: convert_csr_field(config.sscratch),
+            sepc: convert_csr_field(config.sepc),
+            scause: convert_csr_field(config.scause),
+            stval: convert_csr_field(config.stval),
+            satp: convert_csr_field(config.satp),
+            scounteren: convert_csr_field(config.scounteren),
+            ilrsc: convert_csr_field(config.ilrsc),
+            iflags: convert_csr_field(config.iflags)
         }
     }
 }
@@ -272,69 +270,6 @@ impl From<&grpc_stubs::cartesi_machine::MemoryRangeConfig> for MemoryRangeConfig
             length: config.length,
             shared: config.shared,
             image_filename: config.image_filename.clone(),
-        }
-    }
-}
-
-#[doc = " Cartesi machine CLINT device state configuration"]
-#[derive(Debug, Copy, Clone, Default)]
-pub struct ClintConfig {
-    #[doc = "< Value of mtimecmp CSR"]
-    pub mtimecmp: u64,
-}
-
-impl ClintConfig {
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
-impl From<&grpc_stubs::cartesi_machine::ClintConfig> for ClintConfig {
-    fn from(config: &grpc_stubs::cartesi_machine::ClintConfig) -> Self {
-        ClintConfig {
-            mtimecmp: match config.mtimecmp_oneof {
-                Some(MtimecmpOneof::Mtimecmp(x)) => x,
-                None => 0,
-            },
-        }
-    }
-}
-
-#[doc = " Cartesi machine HTIF device state configuration"]
-#[derive(Debug, Copy, Clone, Default)]
-pub struct HtifConfig {
-    #[doc = "< Value of fromhost CSR"]
-    pub fromhost: u64,
-    #[doc = "< Value of tohost CSR"]
-    pub tohost: u64,
-    #[doc = "< Make console getchar available?"]
-    pub console_getchar: bool,
-    #[doc = "< Make manua yield progress available?"]
-    pub yield_manual: bool,
-    #[doc = "< Make yield automatic available?"]
-    pub yield_automatic: bool,
-}
-
-impl HtifConfig {
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
-impl From<&grpc_stubs::cartesi_machine::HtifConfig> for HtifConfig {
-    fn from(config: &grpc_stubs::cartesi_machine::HtifConfig) -> Self {
-        HtifConfig {
-            fromhost: match config.fromhost_oneof {
-                Some(FromhostOneof::Fromhost(x)) => x,
-                None => 0,
-            },
-            tohost: match config.tohost_oneof {
-                Some(TohostOneof::Tohost(x)) => x,
-                None => 0,
-            },
-            console_getchar: config.console_getchar,
-            yield_manual: config.yield_manual,
-            yield_automatic: config.yield_automatic,
         }
     }
 }
@@ -448,16 +383,16 @@ impl From<&grpc_stubs::cartesi_machine::MachineConfig> for MachineConfig {
             },
             flash_drives: { mc.flash_drive.iter().map(MemoryRangeConfig::from).collect() },
             clint: match &mc.clint {
-                Some(clint_config) => ClintConfig::from(clint_config),
-                None => ClintConfig::new(),
+                Some(clint_config) => ClintConfig::from(clint_config.clone()),
+                None => Default::default(),
             },
             dhd: match &mc.dhd {
                 Some(dhd_config) => DhdConfig::from(dhd_config),
                 None => DhdConfig::new(),
             },
             htif: match &mc.htif {
-                Some(htif_config) => HtifConfig::from(htif_config),
-                None => HtifConfig::new(),
+                Some(htif_config) => HtifConfig::from(htif_config.clone()),
+                None => Default::default(),
             },
             rollup: match &mc.rollup {
                 Some(rollup_config) => RollupConfig::from(rollup_config),
@@ -689,7 +624,7 @@ impl From<&grpc_stubs::cartesi_machine::AccessLog> for AccessLog {
 }
 
 #[doc = "Client for Cartesi emulator machine server"]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GrpcCartesiMachineClient {
     server_address: String,
     client: MachineClient<tonic::transport::Channel>,
@@ -890,12 +825,12 @@ impl GrpcCartesiMachineClient {
     }
 
     /// Replaces a flash drive on a remote machine
-    pub async fn replace_flash_drive(
+    pub async fn replace_memory_range(
         &mut self,
-        config: &MemoryRangeConfig,
+        config: &cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::MemoryRangeConfig,
     ) -> Result<Void, Box<dyn std::error::Error>> {
         let request = tonic::Request::new(ReplaceMemoryRangeRequest {
-            config: Some(grpc_stubs::cartesi_machine::MemoryRangeConfig::from(config)),
+            config: Some(config.clone()),
         });
         let response = self.client.replace_memory_range(request).await?;
         Ok(Void {})
@@ -1007,13 +942,6 @@ impl GrpcCartesiMachineClient {
     pub async fn verify_merkle_tree(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         let request = tonic::Request::new(Void {});
         let response = self.client.verify_merkle_tree(request).await?;
-        Ok(response.into_inner().success)
-    }
-
-    /// Update the Merkle tree so it matches the contents of the remote machine state
-    pub async fn update_merkle_tree(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
-        let request = tonic::Request::new(Void {});
-        let response = self.client.update_merkle_tree(request).await?;
         Ok(response.into_inner().success)
     }
 

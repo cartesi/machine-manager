@@ -1,15 +1,15 @@
 name: Docker
 on: [push]
 env:
-  ROM_VERSION: v0.8.0
-  KERNEL_VERSION: v0.9.0
-  ROOTFS_VERSION: v0.8.0
-  EMULATOR_VERSION: 0.8.0
-  KERNEL_FILE: linux-5.5.19-ctsi-3.bin
+  ROM_VERSION: v0.12.0
+  KERNEL_VERSION: v0.13.0
+  ROOTFS_VERSION: v0.14.0
+  KERNEL_FILE: linux-5.5.19-ctsi-6.bin
+  EMULATOR_VERSION: 0.11.1
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
         with:
@@ -59,7 +59,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
         with:
@@ -87,9 +87,10 @@ jobs:
       - name: Install Ubuntu dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y build-essential curl libboost-filesystem-dev libreadline-dev libboost-context-dev libboost-coroutine-dev libboost-serialization-dev libboost-filesystem-dev libssl-dev libc-ares-dev zlib1g-dev ca-certificates patchelf automake cmake clang-tidy-12 clang-format-12 liblua5.3-dev lua-socket
+          sudo apt-get install -y build-essential curl libboost-filesystem-dev libreadline-dev libboost-context-dev libboost-coroutine-dev libboost-serialization-dev libboost-log-dev libboost-filesystem-dev libssl-dev libc-ares-dev zlib1g-dev ca-certificates patchelf automake cmake clang-tidy-12 clang-format-12 liblua5.3-dev lua-socket
           curl https://sh.rustup.rs -sSf | bash -s -- -y
           echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
+          export ARCH=$(uname -m | sed 's/aarch64/aarch_64/') && curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v3.20.1/protoc-3.20.1-linux-$ARCH.zip && unzip protoc-3.20.1-linux-$ARCH.zip -d $HOME/.local
 
       - name: Build machine emulator image
         id: docker_build_machine_emulator
@@ -146,25 +147,26 @@ jobs:
           sha256sum /opt/cartesi/share/images/rom.bin
           sha256sum /opt/cartesi/share/images/rootfs.ext2
           sha256sum /opt/cartesi/bin/remote-cartesi-machine
+          ls -al /opt/cartesi/share/images/
 
       - name: Build grpc stub dependencies
         run: |
-          cd cartesi-grpc-interfaces && cargo build --release
+          cd cartesi-grpc-interfaces && PATH="$PATH:$HOME/.local/bin" cargo build --release
 
       - name: Build Cartesi emulator machine grpc client
         run: |
-          cd grpc-cartesi-machine && cargo build --release
+          cd grpc-cartesi-machine && PATH="$PATH:$HOME/.local/bin" cargo build --release
 
       - name: Run unit tests for Cartesi emulator machine grpc client
         run: |
-          cd grpc-cartesi-machine && cargo test --release -- --test-threads=1
+          cd grpc-cartesi-machine && REMOTE_CARTESI_MACHINE_LOG_LEVEL=trace PATH="$PATH:$HOME/.local/bin" cargo test --release -- --test-threads=1
 
       - name: Build Machine Manager Service
         run: |
-          cd machine-manager-server && cargo build --release && cargo install --force --path . --root /opt/cartesi
+          cd machine-manager-server && PATH="$PATH:$HOME/.local/bin" cargo build --release && PATH="$PATH:$HOME/.local/bin" cargo install --force --path . --root /opt/cartesi
 
       - name: Execute Machine Manager Tests
         run: |
           export CARTESI_BIN_PATH=/opt/cartesi/bin
           export CARTESI_IMAGE_PATH=/opt/cartesi/share/images
-          cd tests/rust-test-client && cargo test --release
+          cd tests/rust-test-client && PATH="$PATH:$HOME/.local/bin" cargo test --release

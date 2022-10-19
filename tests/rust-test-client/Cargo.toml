@@ -8,10 +8,10 @@ name = "cucumber"
 harness = false
 
 [dependencies]
-tonic = "0.5"
-prost = "0.8"
+tonic = "0.8.2"
+prost = "0.11"
 async-trait = "0.1.42"
-tokio = { version = "~1.12.0", features = ["macros", "rt-multi-thread", "process"]}
+tokio = { version = "~1.12.0", features = ["macros", "rt-multi-thread", "process", "time"]}
 futures = "0.3.4"
 rand = "0.7.2"
 regex = "1.5"
@@ -19,7 +19,7 @@ sha2 = "0.9.6"
 json = "0.12.4"
 
 [build-dependencies]
-tonic-build = "0.5"
+tonic-build = "0.8.2"
 
 [dev-dependencies]
 "cucumber_rust" = "0.9"
