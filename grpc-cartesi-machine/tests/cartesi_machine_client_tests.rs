@@ -17,6 +17,7 @@ use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::CheckInRequest;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::Csr;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::Void;
 use grpc_cartesi_machine::*;
+use grpc_cartesi_machine::conversions::*;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use rstest::*;
 use std::future::Future;
@@ -966,7 +967,7 @@ mod local_server {
         };
         context
             .get_server()
-            .replace_flash_drive(&memory_range_config)
+            .replace_memory_range(&cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::MemoryRangeConfig::from(&memory_range_config))
             .await?;
         let ret = context
             .get_server()
