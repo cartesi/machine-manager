@@ -19,8 +19,8 @@ Feature: SessionReadWriteMemory feature
 
         Examples:
             | cycle |        address      | length |              bytes               |
-            |   1   | 9223372036854775808 |   16   | 00000000000000000000000000000000 |
-            |  30   | 9223372036854775808 |   16   | 00000000000000000000000000000000 |
+            |   1   | 36028797018963970 |   16   | 00000000000000000000000000000000 |
+            |  30   | 36028797018963970 |   16   | 00000000000000000000000000000000 |
 
     Scenario Outline: read written value
         Given machine manager server is up
@@ -31,7 +31,7 @@ Feature: SessionReadWriteMemory feature
 
         Examples:
             | cycle |       address       | length |    data    |             bytes                |
-            |  30   | 9223372036854775808 |   16   | HELLOWORLD | 48454C4C4F574F524C44000000000000 |
+            |  30   | 36028797018963970 |   16   | HELLOWORLD | 48454C4C4F574F524C44000000000000 |
 
     Scenario Outline: read on invalid cycle
 
@@ -46,7 +46,7 @@ Feature: SessionReadWriteMemory feature
 
         Examples:
             | cycle |        address      | length |
-            |   5   | 9223372036854775808 |   16   |
+            |   5   | 36028797018963970 |   16   |
 
     Scenario Outline: write on invalid cycle
 
@@ -60,4 +60,4 @@ Feature: SessionReadWriteMemory feature
 
         Examples:
             | cycle |        address      |    data    |
-            |   5   | 9223372036854775808 | HELLOWORLD |
+            |   5   | 36028797018963970 | HELLOWORLD |

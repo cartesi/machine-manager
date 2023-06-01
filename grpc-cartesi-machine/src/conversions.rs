@@ -10,13 +10,9 @@
 // specific language governing permissions and limitations under the License.
 
 use cartesi_grpc_interfaces::grpc_stubs;
-
 impl From<&crate::MachineRuntimeConfig> for grpc_stubs::cartesi_machine::MachineRuntimeConfig {
     fn from(config: &crate::MachineRuntimeConfig) -> Self {
         grpc_stubs::cartesi_machine::MachineRuntimeConfig {
-            dhd: Some(grpc_stubs::cartesi_machine::DhdRuntimeConfig {
-                source_address: config.dhd.source_address.clone(),
-            }),
             concurrency: Some(grpc_stubs::cartesi_machine::ConcurrencyConfig {
                 update_merkle_tree: config.concurrency.update_merkle_tree,
             }),
@@ -143,6 +139,44 @@ pub fn convert_x_csr_field(
     result
 }
 
+pub fn convert_f_csr_field(
+    config: &grpc_stubs::cartesi_machine::ProcessorConfig,
+) -> [u64; 32usize] {
+    let mut result: [u64; 32usize] = [0; 32usize];
+    result[0] = convert_csr_field(config.f1);
+    result[1] = convert_csr_field(config.f2);
+    result[2] = convert_csr_field(config.f3);
+    result[3] = convert_csr_field(config.f4);
+    result[4] = convert_csr_field(config.f5);
+    result[5] = convert_csr_field(config.f6);
+    result[6] = convert_csr_field(config.f7);
+    result[7] = convert_csr_field(config.f8);
+    result[8] = convert_csr_field(config.f9);
+    result[9] = convert_csr_field(config.f10);
+    result[10] = convert_csr_field(config.f11);
+    result[11] = convert_csr_field(config.f12);
+    result[12] = convert_csr_field(config.f13);
+    result[13] = convert_csr_field(config.f14);
+    result[14] = convert_csr_field(config.f15);
+    result[15] = convert_csr_field(config.f16);
+    result[16] = convert_csr_field(config.f17);
+    result[17] = convert_csr_field(config.f18);
+    result[18] = convert_csr_field(config.f19);
+    result[19] = convert_csr_field(config.f20);
+    result[20] = convert_csr_field(config.f21);
+    result[21] = convert_csr_field(config.f22);
+    result[22] = convert_csr_field(config.f23);
+    result[23] = convert_csr_field(config.f24);
+    result[24] = convert_csr_field(config.f25);
+    result[25] = convert_csr_field(config.f26);
+    result[26] = convert_csr_field(config.f27);
+    result[27] = convert_csr_field(config.f28);
+    result[28] = convert_csr_field(config.f29);
+    result[29] = convert_csr_field(config.f30);
+    result[30] = convert_csr_field(config.f31);
+    result
+}
+
 pub fn convert_csr_field(field: ::core::option::Option<u64>) -> u64
 where
 {
@@ -186,12 +220,44 @@ impl From<&crate::ProcessorConfig> for grpc_stubs::cartesi_machine::ProcessorCon
             x29: Some(config.x[28]),
             x30: Some(config.x[29]),
             x31: Some(config.x[30]),
+            f0: Some(config.f[0]),
+            f1: Some(config.f[1]),
+            f2: Some(config.f[2]),
+            f3: Some(config.f[3]),
+            f4: Some(config.f[4]),
+            f5: Some(config.f[5]),
+            f6: Some(config.f[6]),
+            f7: Some(config.f[7]),
+            f8: Some(config.f[8]),
+            f9: Some(config.f[9]),
+            f10: Some(config.f[10]),
+            f11: Some(config.f[11]),
+            f12: Some(config.f[12]),
+            f13: Some(config.f[13]),
+            f14: Some(config.f[14]),
+            f15: Some(config.f[15]),
+            f16: Some(config.f[16]),
+            f17: Some(config.f[17]),
+            f18: Some(config.f[18]),
+            f19: Some(config.f[19]),
+            f20: Some(config.f[20]),
+            f21: Some(config.f[21]),
+            f22: Some(config.f[22]),
+            f23: Some(config.f[23]),
+            f24: Some(config.f[24]),
+            f25: Some(config.f[25]),
+            f26: Some(config.f[26]),
+            f27: Some(config.f[27]),
+            f28: Some(config.f[28]),
+            f29: Some(config.f[29]),
+            f30: Some(config.f[30]),
+            f31: Some(config.f[30]),
             pc: Some(config.pc),
             mvendorid: Some(config.mvendorid),
             marchid: Some(config.marchid),
             mimpid: Some(config.mimpid),
             mcycle: Some(config.mcycle),
-            minstret: Some(config.minstret),
+            icycleinstret: Some(config.icycleinstret),
             mstatus: Some(config.mstatus),
             mtvec: Some(config.mtvec),
             mscratch: Some(config.mscratch),
@@ -212,7 +278,10 @@ impl From<&crate::ProcessorConfig> for grpc_stubs::cartesi_machine::ProcessorCon
             satp: Some(config.satp),
             scounteren: Some(config.scounteren),
             ilrsc: Some(config.ilrsc),
-            iflags: Some(config.iflags)
+            iflags: Some(config.iflags),
+            menvcfg: Some(config.menvcfg),
+            senvcfg: Some(config.senvcfg),
+            fcsr: Some(config.fcsr),
         }
     }
 }
@@ -235,6 +304,23 @@ impl From<&crate::RomConfig> for grpc_stubs::cartesi_machine::RomConfig {
     }
 }
 
+impl From<&crate::TlbConfig> for grpc_stubs::cartesi_machine::TlbConfig {
+    fn from(config: &crate::TlbConfig) -> Self {
+        grpc_stubs::cartesi_machine::TlbConfig {
+            image_filename: config.image_filename.clone(),
+        }
+    }
+}
+
+impl From<&crate::UarchConfig> for grpc_stubs::cartesi_machine::UarchConfig {
+    fn from(config: &crate::UarchConfig) -> Self {
+        grpc_stubs::cartesi_machine::UarchConfig {
+            processor: config.processor.clone(),
+            ram: config.ram.clone(),
+        }
+    }
+}
+
 impl From<&crate::MemoryRangeConfig> for grpc_stubs::cartesi_machine::MemoryRangeConfig {
     fn from(config: &crate::MemoryRangeConfig) -> Self {
         grpc_stubs::cartesi_machine::MemoryRangeConfig {
@@ -242,19 +328,6 @@ impl From<&crate::MemoryRangeConfig> for grpc_stubs::cartesi_machine::MemoryRang
             length: config.length,
             image_filename: config.image_filename.clone(),
             shared: config.shared,
-        }
-    }
-}
-
-impl From<&crate::DhdConfig> for grpc_stubs::cartesi_machine::DhdConfig {
-    fn from(config: &crate::DhdConfig) -> Self {
-        grpc_stubs::cartesi_machine::DhdConfig {
-            tstart: config.tstart,
-            tlength: config.tlength,
-            image_filename: config.image_filename.clone(),
-            dlength: config.dlength,
-            hlength: config.hlength,
-            h: config.h.to_vec(),
         }
     }
 }
@@ -294,6 +367,10 @@ impl From<&crate::MachineConfig> for grpc_stubs::cartesi_machine::MachineConfig 
             )),
             ram: Some(grpc_stubs::cartesi_machine::RamConfig::from(&config.ram)),
             rom: Some(grpc_stubs::cartesi_machine::RomConfig::from(&config.rom)),
+            tlb: Some(grpc_stubs::cartesi_machine::TlbConfig::from(&config.tlb)),
+            uarch: Some(grpc_stubs::cartesi_machine::UarchConfig::from(
+                &config.uarch,
+            )),
             flash_drive: config
                 .flash_drives
                 .iter()
@@ -302,8 +379,9 @@ impl From<&crate::MachineConfig> for grpc_stubs::cartesi_machine::MachineConfig 
             clint: Some(grpc_stubs::cartesi_machine::ClintConfig::from(
                 config.clint.clone(),
             )),
-            htif: Some(grpc_stubs::cartesi_machine::HtifConfig::from(config.htif.clone())),
-            dhd: Some(grpc_stubs::cartesi_machine::DhdConfig::from(&config.dhd)),
+            htif: Some(grpc_stubs::cartesi_machine::HtifConfig::from(
+                config.htif.clone(),
+            )),
             rollup: Some(grpc_stubs::cartesi_machine::RollupConfig::from(
                 &config.rollup,
             )),

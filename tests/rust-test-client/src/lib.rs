@@ -49,19 +49,54 @@ pub fn generate_default_machine_config(files_dir: &str) -> MachineConfig {
             x29: Some(0),
             x30: Some(0),
             x31: Some(0),
+            f0: Some(0),
+            f1: Some(0),
+            f2: Some(0),
+            f3: Some(0),
+            f4: Some(0),
+            f5: Some(0),
+            f6: Some(0),
+            f7: Some(0),
+            f8: Some(0),
+            f9: Some(0),
+            f10: Some(0),
+            f11: Some(0),
+            f12: Some(0),
+            f13: Some(0),
+            f14: Some(0),
+            f15: Some(0),
+            f16: Some(0),
+            f17: Some(0),
+            f18: Some(0),
+            f19: Some(0),
+            f20: Some(0),
+            f21: Some(0),
+            f22: Some(0),
+            f23: Some(0),
+            f24: Some(0),
+            f25: Some(0),
+            f26: Some(0),
+            f27: Some(0),
+            f28: Some(0),
+            f29: Some(0),
+            f30: Some(0),
+            f31: Some(0),
+            fcsr: Some(0),
+            menvcfg: Some(0),
+            senvcfg: Some(0),
             pc: Some(0x1000),
             mvendorid: Some(0x6361727465736920),
-            marchid: Some(0xc),
+            marchid: Some(0xf),
             mimpid: Some(1),
             mcycle: Some(0),
-            minstret: Some(0),
+            icycleinstret: Some(0),
             mstatus: Some(0),
             mtvec: Some(0),
             mscratch: Some(0),
             mepc: Some(0),
             mcause: Some(0),
             mtval: Some(0),
-            misa: Some(0x141101),
+            misa: Some(0x800000000014112d),
             mie: Some(0),
             mip: Some(0),
             medeleg: Some(0),
@@ -77,8 +112,52 @@ pub fn generate_default_machine_config(files_dir: &str) -> MachineConfig {
             ilrsc: Some(u64::MAX),
             iflags: Some(0x0),
         }),
+        tlb: Some(TlbConfig {
+            image_filename: "".to_string(),
+        }),
+        uarch: Some(UarchConfig {
+            processor: Some(UarchProcessorConfig {
+                x1: Some(0),
+                x2: Some(0),
+                x3: Some(0),
+                x4: Some(0),
+                x5: Some(0),
+                x6: Some(0),
+                x7: Some(0),
+                x8: Some(0),
+                x9: Some(0),
+                x10: Some(0),
+                x11: Some(0),
+                x12: Some(0),
+                x13: Some(0),
+                x14: Some(0),
+                x15: Some(0),
+                x16: Some(0),
+                x17: Some(0),
+                x18: Some(0),
+                x19: Some(0),
+                x20: Some(0),
+                x21: Some(0),
+                x22: Some(0),
+                x23: Some(0),
+                x24: Some(0),
+                x25: Some(0),
+                x26: Some(0),
+                x27: Some(0),
+                x28: Some(0),
+                x29: Some(0),
+                x30: Some(0),
+                x31: Some(0),
+                pc: Some(0x70000000),
+                cycle: Some(0),
+            }),
+            ram: Some(UarchRamConfig {
+                length: 77128,
+                image_filename: String::from("/opt/cartesi/share/images/uarch-ram.bin"),
+            }),
+        }),
         ram: Some(RamConfig {
-            length: 6983680,
+            length: 64 << 20,
             image_filename: format!("{}/linux.bin", files_dir),
         }),
         rom: Some(RomConfig {
@@ -90,8 +169,8 @@ pub fn generate_default_machine_config(files_dir: &str) -> MachineConfig {
             image_filename: format!("{}/rom.bin", files_dir),
         }),
         flash_drive: vec![MemoryRangeConfig {
-            start: 1 << 63,
-            length: 83886080,
+            start: 1 << 55,
+            length: 71303168,
             image_filename: format!("{}/rootfs.ext2", files_dir),
             shared: false,
         }],
@@ -104,14 +183,6 @@ pub fn generate_default_machine_config(files_dir: &str) -> MachineConfig {
             yield_automatic: false,
             fromhost: Some(0),
             tohost: Some(0),
-        }),
-        dhd: Some(DhdConfig {
-            tstart: 0,
-            tlength: 0,
-            image_filename: String::new(),
-            dlength: 0,
-            hlength: 0,
-            h: vec![0; 4],
         }),
         rollup: Some(RollupConfig {
             rx_buffer: Some(MemoryRangeConfig {
@@ -150,11 +221,9 @@ pub fn generate_default_machine_config(files_dir: &str) -> MachineConfig {
 
 pub fn generate_default_machine_rt_config() -> MachineRuntimeConfig {
     MachineRuntimeConfig {
-        dhd: None,
         concurrency: None,
     }
 }
-
 #[derive(Default)]
 pub struct MachineManagerClientProxy {
     pub session_id: String,
@@ -230,7 +299,7 @@ impl MachineManagerClientProxy {
             proofs: true,
             annotations: true,
         });
-        let step_request = StepRequest {
+        let step_request = StepUarchRequest {
             log_type,
             one_based: false,
         };
@@ -357,7 +426,7 @@ impl MachineClientProxy {
         RunRequest { limit }
     }
 
-    pub fn build_step_request(&self, manager_request: SessionStepRequest) -> StepRequest {
+    pub fn build_step_request(&self, manager_request: SessionStepRequest) -> StepUarchRequest {
         let session_step_request::StepParamsOneof::StepParams(step_request) =
             manager_request.step_params_oneof.unwrap();
         return step_request;

@@ -1,11 +1,11 @@
 name: Docker
 on: [push]
 env:
-  ROM_VERSION: v0.12.0
-  KERNEL_VERSION: v0.13.0
-  ROOTFS_VERSION: v0.14.0
-  KERNEL_FILE: linux-5.5.19-ctsi-6.bin
-  EMULATOR_VERSION: 0.11.1
+  ROM_VERSION: v0.16.0
+  KERNEL_VERSION: v0.16.0
+  ROOTFS_VERSION: v0.17.0
+  KERNEL_FILE: linux-5.15.63-ctsi-2.bin
+  EMULATOR_VERSION: 0.14.0
 jobs:
   build:
     name: Build
@@ -86,7 +86,7 @@ jobs:
       - name: Install Ubuntu dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y build-essential curl libboost-filesystem-dev libreadline-dev libboost-context-dev libboost-coroutine-dev libboost-serialization-dev libboost-log-dev libboost-filesystem-dev libssl-dev libc-ares-dev zlib1g-dev ca-certificates patchelf automake cmake clang-tidy-12 clang-format-12 liblua5.3-dev lua-socket
+          sudo apt-get install -y build-essential curl libboost-filesystem-dev libreadline-dev libboost-context-dev libboost-coroutine-dev libboost-serialization-dev libboost-log-dev libboost-filesystem-dev libssl-dev libc-ares-dev zlib1g-dev ca-certificates patchelf automake cmake clang-tidy-12 clang-format-12 liblua5.3-dev lua-socket libcrypto++8 libboost-log1.74.0 libc-ares2
           curl https://sh.rustup.rs -sSf | bash -s -- -y
           echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
           export ARCH=$(uname -m | sed 's/aarch64/aarch_64/') && curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v3.20.1/protoc-3.20.1-linux-$ARCH.zip && unzip protoc-3.20.1-linux-$ARCH.zip -d $HOME/.local
@@ -118,7 +118,7 @@ jobs:
         with:
           repository: ${{ steps.git_org.outputs.current_organization }}/image-rootfs
           tag: ${{ env.ROOTFS_VERSION }}
-          file: rootfs.ext2
+          file: rootfs-${{ env.ROOTFS_VERSION }}.ext2
           token: ${{ secrets.CI_TOKEN }}
 
       - name: Download [kernel.bin]
@@ -134,19 +134,21 @@ jobs:
         with:
           repository: ${{ steps.git_org.outputs.current_organization }}/machine-emulator-rom
           tag: ${{ env.ROM_VERSION }}
-          file: rom.bin
+          file: rom-${{ env.ROM_VERSION }}.bin
           token: ${{ secrets.CI_TOKEN }}
 #
       - name: Move images to /opt/cartesi/share/images directory
         run: |
           sudo chmod a+rwx -R /opt/cartesi
+          mv rom-${{ env.ROM_VERSION }}.bin rom.bin
+          mv rootfs-${{ env.ROOTFS_VERSION }}.ext2 rootfs.ext2
           mv rom.bin rootfs.ext2 /opt/cartesi/share/images
           mv ${{ env.KERNEL_FILE }} /opt/cartesi/share/images/linux.bin
           sha256sum /opt/cartesi/share/images/linux.bin
           sha256sum /opt/cartesi/share/images/rom.bin
           sha256sum /opt/cartesi/share/images/rootfs.ext2
+          sha256sum /opt/cartesi/share/images/uarch-ram.bin
           sha256sum /opt/cartesi/bin/remote-cartesi-machine
-          ls -al /opt/cartesi/share/images/
 
       - name: Build grpc stub dependencies
         run: |
@@ -158,6 +160,7 @@ jobs:
 
       - name: Run unit tests for Cartesi emulator machine grpc client
         run: |
+          ls -lR /opt/cartesi
           cd grpc-cartesi-machine && REMOTE_CARTESI_MACHINE_LOG_LEVEL=trace PATH="$PATH:$HOME/.local/bin" cargo test --release -- --test-threads=1
 
       - name: Build Machine Manager Service

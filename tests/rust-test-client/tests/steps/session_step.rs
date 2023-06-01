@@ -16,7 +16,7 @@ use crate::steps::session_run::{run_machine, strs_to_uints};
 use crate::world::TestWorld;
 use cucumber_rust::{t, Steps};
 use json::object;
-use rust_test_client::stubs::cartesi_machine::{AccessLog, StepResponse};
+use rust_test_client::stubs::cartesi_machine::{AccessLog, StepUarchResponse};
 use rust_test_client::stubs::cartesi_machine_manager::*;
 use sha2::Digest;
 use std::boxed::Box;
@@ -105,7 +105,7 @@ pub fn steps() -> Steps<TestWorld> {
                         .grpc_client
                         .as_mut()
                         .unwrap()
-                        .step(verification_request)
+                        .step_uarch(verification_request)
                         .await;
                     if let Err(e) = verification_response {
                         panic!("Unable to make verification step: {}", e);
@@ -137,7 +137,7 @@ pub fn steps() -> Steps<TestWorld> {
             let verification_response = world
                 .response
                 .get(&String::from("verification_response"))
-                .and_then(|x| x.downcast_ref::<StepResponse>())
+                .and_then(|x| x.downcast_ref::<StepUarchResponse>())
                 .take()
                 .expect("No verification StepResponse type in the result");
             let log_string = access_log_to_json(&response.log.as_ref().unwrap());

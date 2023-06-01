@@ -14,6 +14,8 @@
 set -e
 
 mkdir -p test-files
-wget -O test-files/linux.bin -c https://github.com/cartesi-corp/image-kernel/releases/download/v0.8.0/linux-5.5.19-ctsi-2.bin
-wget -O test-files/rom.bin -c https://github.com/cartesi-corp/machine-emulator-rom/releases/download/v0.7.0/rom.bin
-wget -O test-files/rootfs.ext2 -c https://github.com/cartesi-corp/image-rootfs/releases/download/v0.7.0/rootfs.ext2
+wget -O test-files/linux.bin -c https://github.com/cartesi/image-kernel/releases/download/v0.16.0/linux-5.15.63-ctsi-2.bin
+wget -O test-files/rom.bin -c https://github.com/cartesi/machine-emulator-rom/releases/download/v0.16.0/rom-v0.16.0.bin
+wget -O test-files/rootfs.ext2 -c https://github.com/cartesi/image-rootfs/releases/download/v0.17.0/rootfs-v0.17.0.ext2
+wget -O test-files/machine-emulator-Linux-v0.14.0.tar.gz -c https://github.com/cartesi/machine-emulator/releases/download/v0.14.0/machine-emulator-Linux-v0.14.0.tar.gz
+tar -vxC test-files -f test-files/machine-emulator-Linux-v0.14.0.tar.gz --strip-components=3 ./share/images/uarch-ram.bin

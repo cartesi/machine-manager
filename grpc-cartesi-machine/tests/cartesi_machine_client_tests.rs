@@ -14,10 +14,12 @@ use async_mutex::Mutex;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::machine_check_in_server::MachineCheckIn;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::machine_check_in_server::MachineCheckInServer;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::CheckInRequest;
+use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::{UarchProcessorConfig, UarchRamConfig};
+
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::Csr;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::Void;
-use grpc_cartesi_machine::*;
 use grpc_cartesi_machine::conversions::*;
+use grpc_cartesi_machine::*;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use rstest::*;
 use std::future::Future;
@@ -26,13 +28,13 @@ use tonic::transport::Server;
 use tonic::{Request, Response};
 
 static INITIAL_ROOT_HASH: Hash = Hash([
-    47, 32, 212, 175, 68, 100, 144, 146, 54, 0, 182, 91, 46, 44, 4, 180, 130, 199, 222, 192, 66, 213,
-    196, 179, 196, 234, 147, 1, 120, 251, 245, 175
+    144, 183, 179, 236, 208, 219, 93, 54, 39, 226, 87, 144, 124, 49, 108, 83, 217, 127, 21, 140,
+    211, 229, 232, 237, 231, 73, 89, 249, 23, 240, 42, 54,
 ]);
 
 static SECOND_STEP_HASH: Hash = Hash([
-    220, 70, 176, 20, 7, 197, 92, 234, 179, 243, 7, 38, 152, 182, 146, 11, 84, 120, 224, 161, 172, 80, 
-    165, 119, 105, 27, 77, 205, 205, 81, 242, 30
+    110, 90, 203, 63, 104, 45, 25, 191, 179, 40, 66, 74, 136, 38, 7, 235, 164, 40, 142, 134, 175,
+    116, 81, 101, 241, 65, 159, 233, 33, 17, 235, 106,
 ]);
 
 #[allow(dead_code)]
@@ -192,6 +194,47 @@ mod local_server {
             length: 1 << 20,
             image_filename: String::new(),
         };
+        default_config.uarch = UarchConfig {
+            processor: Some(UarchProcessorConfig {
+                x1: Some(0),
+                x2: Some(0),
+                x3: Some(0),
+                x4: Some(0),
+                x5: Some(0),
+                x6: Some(0),
+                x7: Some(0),
+                x8: Some(0),
+                x9: Some(0),
+                x10: Some(0),
+                x11: Some(0),
+                x12: Some(0),
+                x13: Some(0),
+                x14: Some(0),
+                x15: Some(0),
+                x16: Some(0),
+                x17: Some(0),
+                x18: Some(0),
+                x19: Some(0),
+                x20: Some(0),
+                x21: Some(0),
+                x22: Some(0),
+                x23: Some(0),
+                x24: Some(0),
+                x25: Some(0),
+                x26: Some(0),
+                x27: Some(0),
+                x28: Some(0),
+                x29: Some(0),
+                x30: Some(0),
+                x31: Some(0),
+                pc: Some(0x70000000),
+                cycle: Some(0),
+            }),
+            ram: Some(UarchRamConfig {
+                length: 77128,
+                image_filename: String::from("/opt/cartesi/share/images/uarch-ram.bin"),
+            }),
+        };
         default_config.rollup = RollupConfig {
             input_metadata: Some(MemoryRangeConfig {
                 start: 0x60400000,
@@ -217,14 +260,14 @@ mod local_server {
                 image_filename: "".to_string(),
                 shared: false,
             }),
-            tx_buffer: Some(MemoryRangeConfig{
+            tx_buffer: Some(MemoryRangeConfig {
                 start: 0x60200000,
                 length: 2 << 20,
                 image_filename: "".to_string(),
                 shared: false,
             }),
         };
-        
+
         match context
             .get_server()
             .create_machine(&default_config, &MachineRuntimeConfig::default())
@@ -306,7 +349,7 @@ mod local_server {
                 image_filename: "".to_string(),
                 shared: false,
             }),
-            tx_buffer: Some(MemoryRangeConfig{
+            tx_buffer: Some(MemoryRangeConfig {
                 start: 0x60200000,
                 length: 2 << 20,
                 image_filename: "".to_string(),
@@ -327,7 +370,7 @@ mod local_server {
             .output()
             .expect("Unable to create flash image file");
         default_config.flash_drives = vec![MemoryRangeConfig {
-            start: 0x8000000000000000,
+            start: 0x80000000000000,
             image_filename: "/tmp/input_root.raw".to_string(),
             length: 0x3c00000,
             shared: false,
@@ -480,6 +523,47 @@ mod local_server {
             length: 1 << 20,
             image_filename: String::new(),
         };
+        default_config.uarch = UarchConfig {
+            processor: Some(UarchProcessorConfig {
+                x1: Some(0),
+                x2: Some(0),
+                x3: Some(0),
+                x4: Some(0),
+                x5: Some(0),
+                x6: Some(0),
+                x7: Some(0),
+                x8: Some(0),
+                x9: Some(0),
+                x10: Some(0),
+                x11: Some(0),
+                x12: Some(0),
+                x13: Some(0),
+                x14: Some(0),
+                x15: Some(0),
+                x16: Some(0),
+                x17: Some(0),
+                x18: Some(0),
+                x19: Some(0),
+                x20: Some(0),
+                x21: Some(0),
+                x22: Some(0),
+                x23: Some(0),
+                x24: Some(0),
+                x25: Some(0),
+                x26: Some(0),
+                x27: Some(0),
+                x28: Some(0),
+                x29: Some(0),
+                x30: Some(0),
+                x31: Some(0),
+                pc: Some(0x70000000),
+                cycle: Some(0),
+            }),
+            ram: Some(UarchRamConfig {
+                length: 77128,
+                image_filename: String::from("/opt/cartesi/share/images/uarch-ram.bin"),
+            }),
+        };
         default_config.rollup = RollupConfig {
             input_metadata: Some(MemoryRangeConfig {
                 start: 0x60400000,
@@ -505,7 +589,7 @@ mod local_server {
                 image_filename: "".to_string(),
                 shared: false,
             }),
-            tx_buffer: Some(MemoryRangeConfig{
+            tx_buffer: Some(MemoryRangeConfig {
                 start: 0x60200000,
                 length: 2 << 20,
                 image_filename: "".to_string(),
@@ -575,7 +659,7 @@ mod local_server {
             semantic_version,
             SemanticVersion {
                 major: 0,
-                minor: 6,
+                minor: 7,
                 patch: 0,
                 pre_release: "".to_string(),
                 build: "".to_string()
@@ -594,13 +678,12 @@ mod local_server {
         println!("Acquired default config {:?}", default_config);
         assert_eq!(default_config.processor.pc, 4096);
         assert_eq!(default_config.processor.mvendorid, 7161130726739634464);
-        assert_eq!(default_config.processor.marchid, 0xc);
+        assert_eq!(default_config.processor.marchid, 0xf);
         assert_eq!(default_config.ram.length, 0);
         assert_eq!(default_config.rom.image_filename, "");
         assert_eq!(default_config.flash_drives.len(), 0);
         assert_eq!(default_config.htif.fromhost, Some(0));
         assert_eq!(default_config.htif.tohost, Some(0));
-        assert_eq!(default_config.dhd.dlength, 0);
         assert_eq!(default_config.clint.mtimecmp, Some(0));
         Ok(())
     }
@@ -645,7 +728,7 @@ mod local_server {
                 image_filename: "".to_string(),
                 shared: false,
             }),
-            tx_buffer: Some(MemoryRangeConfig{
+            tx_buffer: Some(MemoryRangeConfig {
                 start: 0x60200000,
                 length: 2 << 20,
                 image_filename: "".to_string(),
@@ -675,6 +758,47 @@ mod local_server {
             length: 1 << 20,
             image_filename: String::new(),
         };
+        default_config.uarch = UarchConfig {
+            processor: Some(UarchProcessorConfig {
+                x1: Some(0),
+                x2: Some(0),
+                x3: Some(0),
+                x4: Some(0),
+                x5: Some(0),
+                x6: Some(0),
+                x7: Some(0),
+                x8: Some(0),
+                x9: Some(0),
+                x10: Some(0),
+                x11: Some(0),
+                x12: Some(0),
+                x13: Some(0),
+                x14: Some(0),
+                x15: Some(0),
+                x16: Some(0),
+                x17: Some(0),
+                x18: Some(0),
+                x19: Some(0),
+                x20: Some(0),
+                x21: Some(0),
+                x22: Some(0),
+                x23: Some(0),
+                x24: Some(0),
+                x25: Some(0),
+                x26: Some(0),
+                x27: Some(0),
+                x28: Some(0),
+                x29: Some(0),
+                x30: Some(0),
+                x31: Some(0),
+                pc: Some(0x70000000),
+                cycle: Some(0),
+            }),
+            ram: Some(UarchRamConfig {
+                length: 77128,
+                image_filename: String::from("/opt/cartesi/share/images/uarch-ram.bin"),
+            }),
+        };
         default_config.rollup = RollupConfig {
             input_metadata: Some(MemoryRangeConfig {
                 start: 0x60400000,
@@ -700,7 +824,7 @@ mod local_server {
                 image_filename: "".to_string(),
                 shared: false,
             }),
-            tx_buffer: Some(MemoryRangeConfig{
+            tx_buffer: Some(MemoryRangeConfig {
                 start: 0x60200000,
                 length: 2 << 20,
                 image_filename: "".to_string(),
@@ -865,7 +989,7 @@ mod local_server {
         let ret = context.get_server().read_memory(0x1000, 16).await?;
         assert_eq!(
             ret,
-            vec![151, 2, 0, 0, 147, 130, 66, 6, 115, 144, 82, 48, 55, 21, 0, 0]
+            vec![151, 2, 0, 0, 147, 130, 162, 4, 115, 144, 82, 48, 65, 101, 189, 101]
         );
         Ok(())
     }
@@ -892,7 +1016,7 @@ mod local_server {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut context = context_with_machine_future.await;
         let ret = context.get_server().read_word(0x100).await?;
-        assert_eq!(ret, 4096);
+        assert_eq!(ret, 0);
         Ok(())
     }
 
@@ -940,7 +1064,9 @@ mod local_server {
         assert_eq!(proof.log2_target_size, 10);
         assert_eq!(
             proof.target_hash,
-            Hash([152, 225, 191, 1, 159, 15, 23, 183, 105, 220, 134, 243, 247, 25, 127, 127, 62, 243, 172, 236, 65, 71, 52, 196, 6, 23, 40, 172, 12, 72, 88, 150
+            Hash([
+                112, 159, 132, 11, 162, 147, 207, 192, 177, 21, 152, 61, 114, 33, 155, 95, 119,
+                111, 172, 26, 224, 42, 65, 31, 37, 65, 7, 55, 70, 18, 172, 73
             ])
         );
         assert_eq!(proof.sibling_hashes.len(), 54);
@@ -960,18 +1086,22 @@ mod local_server {
             .expect("Unable to create flash image file");
 
         let memory_range_config = MemoryRangeConfig {
-            start: 0x8000000000000000,
+            start: 0x80000000000000,
             image_filename: "/tmp/input.raw".to_string(),
             length: 0x3c00000,
             shared: true,
         };
         context
             .get_server()
-            .replace_memory_range(&cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::MemoryRangeConfig::from(&memory_range_config))
+            .replace_memory_range(
+                &cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::MemoryRangeConfig::from(
+                    &memory_range_config,
+                ),
+            )
             .await?;
         let ret = context
             .get_server()
-            .read_memory(0x8000000000000000, 12)
+            .read_memory(0x80000000000000, 12)
             .await?;
         assert_eq!(
             ret,
@@ -1017,31 +1147,6 @@ mod local_server {
 
     #[rstest]
     #[tokio::test]
-    async fn test_get_dhd_h_address(
-        context_future: impl Future<Output = Context>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut context = context_future.await;
-        let dhd_h_address = context.get_server().get_dhd_h_address(1).await?;
-        assert_eq!(dhd_h_address, 1073938480);
-        Ok(())
-    }
-
-    #[rstest]
-    #[tokio::test]
-    async fn test_read_write_dhd_h(
-        context_with_machine_future: impl Future<Output = Context>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut context = context_with_machine_future.await;
-        let x_value = context.get_server().read_dhd_h(2).await?;
-        assert_eq!(x_value, 0x0);
-        context.get_server().write_dhd_h(2, 0x1234).await?;
-        let x_value = context.get_server().read_dhd_h(2).await?;
-        assert_eq!(x_value, 0x1234);
-        Ok(())
-    }
-
-    #[rstest]
-    #[tokio::test]
     async fn test_get_csr_address(
         context_future: impl Future<Output = Context>,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -1078,7 +1183,7 @@ mod local_server {
         println!("Acquired initial config {:?}", initial_config);
         assert_eq!(initial_config.processor.pc, 4096);
         assert_eq!(initial_config.processor.mvendorid, 7161130726739634464);
-        assert_eq!(initial_config.processor.marchid, 0xc);
+        assert_eq!(initial_config.processor.marchid, 0xf);
         assert_eq!(initial_config.ram.length, 1048576);
         assert_eq!(
             initial_config.rom.image_filename,
@@ -1087,7 +1192,6 @@ mod local_server {
         assert_eq!(initial_config.flash_drives.len(), 0);
         assert_eq!(initial_config.htif.fromhost, Some(0));
         assert_eq!(initial_config.htif.tohost, Some(0));
-        assert_eq!(initial_config.dhd.dlength, 0);
         assert_eq!(initial_config.clint.mtimecmp, Some(0));
         Ok(())
     }

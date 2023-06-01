@@ -75,3 +75,19 @@ EXPOSE 50051
 ## Changing directory to base
 WORKDIR $BASE
 CMD [ "./bin/machine-manager", "--address", "0.0.0.0", "--port", "50051","--port-checkin","50052"]
+
+FROM build-image
+
+COPY --from=machine-manager-rust /opt/cartesi /opt/cartesi
+
+ENV BASE /opt/cartesi
+ENV CARTESI_IMAGE_PATH $BASE/share/images
+ENV CARTESI_BIN_PATH $BASE/bin
+ENV PROTOC /root/.local/bin/protoc
+
+RUN apt-get update && apt-get install -y libcrypto++8
+RUN apt-get update && apt-get install -y libboost-log1.74.0
+RUN apt-get update && apt-get install -y libc-ares2
+
+WORKDIR /root/tests/rust-test-client
+CMD [ "cargo", "test", "--release", "--", "--nocapture"]
