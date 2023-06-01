@@ -94,6 +94,8 @@ impl From<&grpc_stubs::versioning::SemanticVersion> for SemanticVersion {
 pub struct ProcessorConfig {
     #[doc = "< Value of general-purpose registers"]
     pub x: [u64; 32usize],
+    #[doc = "< Value of f registers"]
+    pub f: [u64; 32usize],
     #[doc = "< Value of pc"]
     pub pc: u64,
     #[doc = "< Value of mvendorid CSR"]
@@ -104,8 +106,8 @@ pub struct ProcessorConfig {
     pub mimpid: u64,
     #[doc = "< Value of mcycle CSR"]
     pub mcycle: u64,
-    #[doc = "< Value of minstret CSR"]
-    pub minstret: u64,
+    #[doc = "< Value of icycleinstret CSR"]
+    pub icycleinstret: u64,
     #[doc = "< Value of mstatus CSR"]
     pub mstatus: u64,
     #[doc = "< Value of mtvec CSR"]
@@ -148,6 +150,12 @@ pub struct ProcessorConfig {
     pub ilrsc: u64,
     #[doc = "< Value of iflags CSR"]
     pub iflags: u64,
+    #[doc = "< Value of senvcfg CSR"]
+    pub senvcfg: u64,
+    #[doc = "< Value of menvcfg CSR"]
+    pub menvcfg: u64,
+    #[doc = "< Value of fcsr CSR"]
+    pub fcsr: u64,
 }
 
 impl ProcessorConfig {
@@ -165,12 +173,13 @@ impl From<&grpc_stubs::cartesi_machine::ProcessorConfig> for ProcessorConfig {
     fn from(config: &grpc_stubs::cartesi_machine::ProcessorConfig) -> Self {
         ProcessorConfig {
             x: convert_x_csr_field(config),
+            f: convert_f_csr_field(config),
             pc: convert_csr_field(config.pc),
             mvendorid: convert_csr_field(config.mvendorid),
             marchid: convert_csr_field(config.marchid),
             mimpid: convert_csr_field(config.mimpid),
             mcycle: convert_csr_field(config.mcycle),
-            minstret: convert_csr_field(config.minstret),
+            icycleinstret: convert_csr_field(config.icycleinstret),
             mstatus: convert_csr_field(config.mstatus),
             mtvec: convert_csr_field(config.mtvec),
             mscratch: convert_csr_field(config.mscratch),
@@ -191,7 +200,10 @@ impl From<&grpc_stubs::cartesi_machine::ProcessorConfig> for ProcessorConfig {
             satp: convert_csr_field(config.satp),
             scounteren: convert_csr_field(config.scounteren),
             ilrsc: convert_csr_field(config.ilrsc),
-            iflags: convert_csr_field(config.iflags)
+            iflags: convert_csr_field(config.iflags),
+            senvcfg: convert_csr_field(config.senvcfg),
+            menvcfg: convert_csr_field(config.menvcfg),
+            fcsr: convert_csr_field(config.fcsr)
         }
     }
 }
@@ -216,6 +228,50 @@ impl From<&grpc_stubs::cartesi_machine::RamConfig> for RamConfig {
         RamConfig {
             length: config.length,
             image_filename: config.image_filename.clone(),
+        }
+    }
+}
+
+#[doc = " Cartesi machine Tlb"]
+#[derive(Debug, Clone, Default)]
+pub struct TlbConfig {
+    #[doc = "< Tlb image file name"]
+    pub image_filename: String,
+}
+
+impl TlbConfig {
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl From<&grpc_stubs::cartesi_machine::TlbConfig> for TlbConfig {
+    fn from(config: &grpc_stubs::cartesi_machine::TlbConfig) -> Self {
+        TlbConfig {
+            image_filename: config.image_filename.clone(),
+        }
+    }
+}
+
+#[doc = " Cartesi machine Uarch"]
+#[derive(Debug, Clone, Default)]
+pub struct UarchConfig {
+    #[doc = "< Uarch processor"]
+    pub processor: ::core::option::Option<UarchProcessorConfig>,
+    #[doc = "< Uarch ram"]
+    pub ram: ::core::option::Option<UarchRamConfig>,}
+
+impl UarchConfig {
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl From<&grpc_stubs::cartesi_machine::UarchConfig> for UarchConfig {
+    fn from(config: &grpc_stubs::cartesi_machine::UarchConfig) -> Self {
+        UarchConfig {
+            processor: config.processor.clone(),
+            ram: config.ram.clone(),
         }
     }
 }
@@ -274,29 +330,6 @@ impl From<&grpc_stubs::cartesi_machine::MemoryRangeConfig> for MemoryRangeConfig
     }
 }
 
-#[doc = " Cartesi machine DHD device state configuration"]
-#[derive(Debug, Clone, Default)]
-pub struct DhdConfig {
-    #[doc = "< Start of target physical memory range for output data"]
-    pub tstart: u64,
-    #[doc = "< Length of target physical memory range for output data"]
-    pub tlength: u64,
-    #[doc = "< Data image file name"]
-    pub image_filename: String,
-    #[doc = "< Output data length CSR"]
-    pub dlength: u64,
-    #[doc = "< Input hash length CSR"]
-    pub hlength: u64,
-    #[doc = "< Input hash words"]
-    pub h: [u64; 4],
-}
-
-impl DhdConfig {
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 #[doc = " Cartesi machine rollup configuration"]
 #[derive(Debug, Clone, Default)]
 pub struct RollupConfig {
@@ -313,18 +346,6 @@ impl RollupConfig {
     }
 }
 
-impl From<&grpc_stubs::cartesi_machine::DhdConfig> for DhdConfig {
-    fn from(config: &grpc_stubs::cartesi_machine::DhdConfig) -> Self {
-        DhdConfig {
-            tstart: config.tstart,
-            tlength: config.tlength,
-            image_filename: config.image_filename.clone(),
-            dlength: config.dlength,
-            hlength: config.hlength,
-            h: config.h.clone().try_into().unwrap_or([0; 4]),
-        }
-    }
-}
 
 impl From<&grpc_stubs::cartesi_machine::RollupConfig> for RollupConfig {
     fn from(config: &grpc_stubs::cartesi_machine::RollupConfig) -> Self {
@@ -362,8 +383,9 @@ pub struct MachineConfig {
     pub flash_drives: Vec<MemoryRangeConfig>,
     pub clint: ClintConfig,
     pub htif: HtifConfig,
-    pub dhd: DhdConfig,
     pub rollup: RollupConfig,
+    pub tlb: TlbConfig,
+    pub uarch: UarchConfig,
 }
 
 impl From<&grpc_stubs::cartesi_machine::MachineConfig> for MachineConfig {
@@ -381,14 +403,18 @@ impl From<&grpc_stubs::cartesi_machine::MachineConfig> for MachineConfig {
                 Some(rom_config) => RomConfig::from(rom_config),
                 None => RomConfig::new(),
             },
+            tlb: match &mc.tlb {
+                Some(tlb_config) => TlbConfig::from(tlb_config),
+                None => TlbConfig::new(),
+            },
+            uarch: match &mc.uarch {
+                Some(uarch_config) => UarchConfig::from(uarch_config),
+                None => UarchConfig::new(),
+            },
             flash_drives: { mc.flash_drive.iter().map(MemoryRangeConfig::from).collect() },
             clint: match &mc.clint {
                 Some(clint_config) => ClintConfig::from(clint_config.clone()),
                 None => Default::default(),
-            },
-            dhd: match &mc.dhd {
-                Some(dhd_config) => DhdConfig::from(dhd_config),
-                None => DhdConfig::new(),
             },
             htif: match &mc.htif {
                 Some(htif_config) => HtifConfig::from(htif_config.clone()),
@@ -398,21 +424,6 @@ impl From<&grpc_stubs::cartesi_machine::MachineConfig> for MachineConfig {
                 Some(rollup_config) => RollupConfig::from(rollup_config),
                 None => RollupConfig::new(),
             },
-        }
-    }
-}
-
-#[doc = " DHD runtime configuration"]
-#[derive(Debug, Clone, Default)]
-pub struct DhdRuntimeConfig {
-    #[doc = "< Address of dehash source"]
-    pub source_address: String,
-}
-
-impl From<&grpc_stubs::cartesi_machine::DhdRuntimeConfig> for DhdRuntimeConfig {
-    fn from(dhd: &grpc_stubs::cartesi_machine::DhdRuntimeConfig) -> Self {
-        DhdRuntimeConfig {
-            source_address: dhd.source_address.clone(),
         }
     }
 }
@@ -434,18 +445,12 @@ impl From<&grpc_stubs::cartesi_machine::ConcurrencyConfig> for ConcurrencyConfig
 #[doc = " Machine runtime configuration"]
 #[derive(Debug, Clone, Default)]
 pub struct MachineRuntimeConfig {
-    pub dhd: DhdRuntimeConfig,
     pub concurrency: ConcurrencyConfig,
 }
 
 impl From<&grpc_stubs::cartesi_machine::MachineRuntimeConfig> for MachineRuntimeConfig {
     fn from(rc: &grpc_stubs::cartesi_machine::MachineRuntimeConfig) -> Self {
         MachineRuntimeConfig {
-            dhd: DhdRuntimeConfig::from(
-                rc.dhd
-                    .as_ref()
-                    .unwrap_or(&grpc_stubs::cartesi_machine::DhdRuntimeConfig::default()),
-            ),
             concurrency: ConcurrencyConfig::from(
                 rc.concurrency
                     .as_ref()
@@ -744,14 +749,14 @@ impl GrpcCartesiMachineClient {
         log_type: &AccessLogType,
         one_based: bool,
     ) -> Result<AccessLog, Box<dyn std::error::Error>> {
-        let request = tonic::Request::new(StepRequest {
+        let request = tonic::Request::new(StepUarchRequest {
             log_type: Some(grpc_stubs::cartesi_machine::AccessLogType {
                 proofs: log_type.proofs,
                 annotations: log_type.annotations,
             }),
             one_based,
         });
-        let response = self.client.step(request).await?;
+        let response = self.client.step_uarch(request).await?;
         match response.into_inner().log {
             Some(log) => Ok(AccessLog::from(&log)),
             None => Err(Box::new(GrpcCartesiMachineError::new(
@@ -865,34 +870,6 @@ impl GrpcCartesiMachineClient {
     pub async fn reset_iflags_y(&mut self) -> Result<Void, Box<dyn std::error::Error>> {
         let request = tonic::Request::new(Void {});
         let response = self.client.reset_iflags_y(request).await?;
-        Ok(Void {})
-    }
-
-    /// Gets the address of a DHD h register
-    pub async fn get_dhd_h_address(
-        &mut self,
-        index: u32,
-    ) -> Result<u64, Box<dyn std::error::Error>> {
-        let request = tonic::Request::new(GetDhdHAddressRequest { index });
-        let response = self.client.get_dhd_h_address(request).await?;
-        Ok(response.into_inner().address)
-    }
-
-    /// Reads the value of DHD's input hash word
-    pub async fn read_dhd_h(&mut self, index: u32) -> Result<u64, Box<dyn std::error::Error>> {
-        let request = tonic::Request::new(ReadDhdHRequest { index });
-        let response = self.client.read_dhd_h(request).await?;
-        Ok(response.into_inner().value)
-    }
-
-    /// Writes the value of DHD's input hash word
-    pub async fn write_dhd_h(
-        &mut self,
-        index: u32,
-        value: u64,
-    ) -> Result<Void, Box<dyn std::error::Error>> {
-        let request = tonic::Request::new(WriteDhdHRequest { index, value });
-        let response = self.client.write_dhd_h(request).await?;
         Ok(Void {})
     }
 

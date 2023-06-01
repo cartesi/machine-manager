@@ -600,7 +600,6 @@ mod local_server {
         assert_eq!(default_config.flash_drives.len(), 0);
         assert_eq!(default_config.htif.fromhost, Some(0));
         assert_eq!(default_config.htif.tohost, Some(0));
-        assert_eq!(default_config.dhd.dlength, 0);
         assert_eq!(default_config.clint.mtimecmp, Some(0));
         Ok(())
     }
@@ -1017,31 +1016,6 @@ mod local_server {
 
     #[rstest]
     #[tokio::test]
-    async fn test_get_dhd_h_address(
-        context_future: impl Future<Output = Context>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut context = context_future.await;
-        let dhd_h_address = context.get_server().get_dhd_h_address(1).await?;
-        assert_eq!(dhd_h_address, 1073938480);
-        Ok(())
-    }
-
-    #[rstest]
-    #[tokio::test]
-    async fn test_read_write_dhd_h(
-        context_with_machine_future: impl Future<Output = Context>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut context = context_with_machine_future.await;
-        let x_value = context.get_server().read_dhd_h(2).await?;
-        assert_eq!(x_value, 0x0);
-        context.get_server().write_dhd_h(2, 0x1234).await?;
-        let x_value = context.get_server().read_dhd_h(2).await?;
-        assert_eq!(x_value, 0x1234);
-        Ok(())
-    }
-
-    #[rstest]
-    #[tokio::test]
     async fn test_get_csr_address(
         context_future: impl Future<Output = Context>,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -1087,7 +1061,6 @@ mod local_server {
         assert_eq!(initial_config.flash_drives.len(), 0);
         assert_eq!(initial_config.htif.fromhost, Some(0));
         assert_eq!(initial_config.htif.tohost, Some(0));
-        assert_eq!(initial_config.dhd.dlength, 0);
         assert_eq!(initial_config.clint.mtimecmp, Some(0));
         Ok(())
     }

@@ -52,7 +52,7 @@ RUN cd /root/machine-manager-server && PATH="$PATH:$HOME/.local/bin" cargo build
 
 # Container final image
 # ----------------------------------------------------
-FROM cartesicorp/machine-emulator:0.11.1 as machine-manager-rust
+FROM cartesi/machine-emulator:0.11.1 as machine-manager-rust
 
 LABEL maintainer="Marko Atanasievski <marko.atanasievski@cartesi.io>"
 

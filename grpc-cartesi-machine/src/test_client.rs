@@ -33,9 +33,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let csr_addr = grpc_machine.get_csr_address(Csr::Mcycle).await?;
     println!("I got csr address of mcycle reg: {}", csr_addr);
 
-    let dhd_addr = grpc_machine.get_dhd_h_address(3).await?;
-    println!("I got dhd  address of reg index 3: {:#X}", dhd_addr);
-
     let semantic_version = grpc_machine.get_version().await?;
     println!("I got dhd  address of reg index 3: {:#?}", semantic_version);
 
