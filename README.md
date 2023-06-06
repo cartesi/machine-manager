@@ -79,7 +79,7 @@ You should see the logs on both the server and client terminals showing the step
 
 Build and run machine-manager-rust-test image
 ```console
-$ docker build . -t cartesi/machine-manager-rust-test -f tests/rust-test-client/Dockerfile
+$ docker build . -t cartesi/machine-manager-rust-test -f Dockerfile-test
 $ docker run -v $(pwd)/test-files:/opt/cartesi/share/images cartesi/machine-manager-rust-test
 ```
 
