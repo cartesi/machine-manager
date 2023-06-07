@@ -291,6 +291,7 @@ impl MachineManagerClientProxy {
         SessionRunRequest {
             session_id: self.session_id.clone(),
             final_cycles: final_cycles.clone(),
+            final_ucycles: vec![],
         }
     }
 
@@ -307,6 +308,7 @@ impl MachineManagerClientProxy {
         SessionStepRequest {
             session_id: self.session_id.clone(),
             initial_cycle,
+            initial_ucycle: 0,
             step_params_oneof: Some(session_step_request::StepParamsOneof::StepParams(
                 step_request,
             )),
@@ -324,6 +326,7 @@ impl MachineManagerClientProxy {
         SessionGetProofRequest {
             session_id: self.session_id.clone(),
             cycle,
+            ucycle: 0,
             target: proof_request,
         }
     }
@@ -372,6 +375,7 @@ impl MachineManagerClientProxy {
         SessionWriteMemoryRequest {
             session_id: self.session_id.clone(),
             cycle,
+            ucycle: 0,
             position: write_memory_request,
         }
     }

@@ -687,6 +687,7 @@ impl Session {
 
                     return Ok(SessionRunProgress {
                         cycle: session.cycle,
+                        ucycle: 0,
                         progress: 100,
                         updated_at: chrono::Utc::now().timestamp() as u64,
                         application_progress: 0,
@@ -816,6 +817,7 @@ impl Session {
         let (execution_progress, ..) = session.get_job_progress(request_id).await?;
         Ok(SessionRunProgress {
             cycle: execution_progress.cycle,
+            ucycle: 0,
             progress: execution_progress.progress,
             updated_at: execution_progress.updated_at,
             application_progress: execution_progress.application_progress,
@@ -858,6 +860,7 @@ impl Session {
                     application_progress: session_result.application_progress,
                     updated_at: session_result.updated_at,
                     cycle: final_cycles[0],
+                    ucycle: 0,
                 };
 
                 log::debug!(

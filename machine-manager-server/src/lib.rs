@@ -145,6 +145,7 @@ impl MachineManagerService {
                             response = SessionRunResponse {
                                 run_oneof: Some(RunOneof::Progress(SessionRunProgress {
                                     cycle: progress.cycle,
+                                    ucycle: 0,
                                     progress: progress.progress,
                                     updated_at: progress.updated_at,
                                     application_progress: progress.application_progress,
