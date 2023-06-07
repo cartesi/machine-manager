@@ -21,16 +21,17 @@ Feature: SessionStep feature
         #   cycle = initial cycle.
 
         Given machine manager server is up
-        And a machine manager server with a machine executed for <cycle> final cycles
-        When the machine manager server asks machine to step on initial cycle <cycle>
-        Then server returns correct access log
+        And a machine manager server with a machine executed for <cycle> final cycles and <ucycle> final ucycles
+        When the machine manager server asks machine to step on initial cycle <cycle> and initial ucycle <ucycle>
+        Then machine manager server returns correct session cycle <result_cycle> and ucycle <result_ucycle>
+        And server returns correct access log
 
         Examples:
-            | cycle |
-            |   1   |
-            |   21  |
-            |   35  |
-            |   30  |
+            | cycle | ucycle | result_cycle | result_ucycle |
+            |   1   |   1    |      1       |      2        |
+            |   21  |   101  |      21      |      102      |
+            |   35  |   250  |      35      |      251      |
+            |   30  |   500  |      30      |      501      |
 
     Scenario Outline: step on invalid cycle
 
@@ -39,11 +40,17 @@ Feature: SessionStep feature
         # session cycle argument, return error. SessionRun request should be used to run machine to particular cycle.
 
         Given machine manager server is up
-        And a machine manager server with a machine executed for <cycle> final cycles
-        When the machine manager server asks machine to step on initial cycle <cycle>
-        #Then machine manager server returns an Internal error
-        Then server returns correct access log
+        And a machine manager server with a machine executed for 20 final cycles and 300 final ucycles
+        When the machine manager server asks machine to step on initial cycle 15 and initial ucycle 300
+        Then machine manager server returns an InvalidArgument error
 
-        Examples:
-            | cycle |
-            |   20  |
+    Scenario Outline: step on invalid ucycle
+
+        # For rust machine manager:
+        # For operations ReadMemory/WriteMemory/Step/GetProof, in case where cycle argument is not equal to current
+        # session ucycle argument, return error. SessionRun request should be used to run machine to particular ucycle.
+
+        Given machine manager server is up
+        And a machine manager server with a machine executed for 20 final cycles and 300 final ucycles
+        When the machine manager server asks machine to step on initial cycle 20 and initial ucycle 150
+        Then machine manager server returns an InvalidArgument error

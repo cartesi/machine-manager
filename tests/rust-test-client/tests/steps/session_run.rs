@@ -19,33 +19,31 @@ use rust_test_client::MachineManagerClientProxy;
 use std::boxed::Box;
 
 pub async fn run_machine(
-    cycles: Vec<u64>,
+    cycles: &Vec<u64>,
+    ucycles: &Vec<u64>,
     client: &mut MachineManagerClientProxy,
 ) -> SessionRunResponse {
-    let run_request = client.build_new_session_run_request(&cycles);
+    let run_request = client.build_new_session_run_request(cycles, ucycles);
     client.run_to_completion(run_request).await
 }
 
-pub fn strs_to_uints(matches: &Vec<String>) -> Vec<u64> {
-    matches[1]
+pub fn str_to_uints(s: &String) -> Vec<u64> {
+    s
         .split(",")
         .map(|x| x.parse::<u64>().unwrap())
         .collect()
 }
 
-pub async fn get_verification_hashes(world: &mut TestWorld, cycles: Vec<u64>) {
+pub async fn get_verification_hashes(world: &mut TestWorld, cycles: &Vec<u64>, ucycles: &Vec<u64>) {
     let mut verification_hashes: Vec<Hash> = vec![];
-    for cycle in cycles {
-        let request = world.machine_proxy.build_run_request(cycle);
-        if let Err(e) = world
-            .machine_proxy
-            .grpc_client
-            .as_mut()
-            .unwrap()
-            .run(request)
-            .await
-        {
-            panic!("Unable to make verification run: {}", e);
+    let mut current_cycle = 0;
+    let mut current_ucycle = 0;    
+    for cycle_idx in 0..cycles.len() {
+        let cycle = cycles[cycle_idx];
+        let ucycle = ucycles[cycle_idx];
+        match world.machine_proxy.run_to(current_cycle, cycle, current_ucycle, ucycle).await {
+            Ok(result) => (current_cycle, current_ucycle) = result,
+            Err(err) => panic!("Unable to make verification run: {}", err),
         }
         let response = world
             .machine_proxy
@@ -60,9 +58,18 @@ pub async fn get_verification_hashes(world: &mut TestWorld, cycles: Vec<u64>) {
         };
         verification_hashes.push(hash);
     }
+
     world.response.insert(
         String::from("verification_hashes"),
         Box::new(verification_hashes),
+    );
+    world.response.insert(
+        String::from("machine_cycle"),
+        Box::new(current_cycle),
+    );
+    world.response.insert(
+        String::from("machine_ucycle"),
+        Box::new(current_ucycle),
     );
 }
 
@@ -82,9 +89,11 @@ pub fn steps() -> Steps<TestWorld> {
         }),
     );
     steps.given_regex_async(
-        r#"the machine executed with cycles ((\d+,)*\d+)"#,
+        r#"the machine executed with cycles ((\d+,)*\d+) and ucycles ((\d+,)*\d+)"#,
         t!(|mut world, ctx| {
-            let ret = run_machine(strs_to_uints(&ctx.matches), &mut world.client_proxy).await;
+            let cycles = str_to_uints(&ctx.matches[1]);
+            let ucycles = str_to_uints(&ctx.matches[3]);
+            let ret = run_machine(&cycles, &ucycles, &mut world.client_proxy).await;
             if let session_run_response::RunOneof::Progress(_) = ret.run_oneof.as_ref().unwrap() {
                 panic!("Invalid state: server job didn't finish");
             }
@@ -96,7 +105,17 @@ pub fn steps() -> Steps<TestWorld> {
         |mut world, ctx| {
             world.response.insert(
                 String::from("exec_cycles"),
-                Box::new(strs_to_uints(&ctx.matches)),
+                Box::new(str_to_uints(&ctx.matches[1])),
+            );
+            world
+        },
+    );
+    steps.given_regex(
+        r#"the ucycles array ((\d+,)*\d+) to run the machine"#,
+        |mut world, ctx| {
+            world.response.insert(
+                String::from("exec_ucycles"),
+                Box::new(str_to_uints(&ctx.matches[1])),
             );
             world
         },
@@ -111,8 +130,15 @@ pub fn steps() -> Steps<TestWorld> {
                 .take()
                 .expect("No Vec<u64> type in the result")
                 .clone();
-            get_verification_hashes(&mut world, cycles.clone().to_vec()).await;
-            let ret = run_machine(cycles.to_vec(), &mut world.client_proxy).await;
+            let ucycles = world
+                .response
+                .get(&String::from("exec_ucycles"))
+                .and_then(|x| x.downcast_ref::<Vec<u64>>())
+                .take()
+                .expect("No Vec<u64> type in the result")
+                .clone();
+            get_verification_hashes(&mut world, &cycles.to_vec(), &ucycles.to_vec()).await;
+            let ret = run_machine(&cycles.to_vec(), &ucycles.to_vec(), &mut world.client_proxy).await;
             if let session_run_response::RunOneof::Result(result) = ret.run_oneof.as_ref().unwrap()
             {
                 let result_hashes: Vec<Hash> = result.hashes.clone();
@@ -120,10 +146,52 @@ pub fn steps() -> Steps<TestWorld> {
                     .response
                     .insert(String::from("hashes"), Box::new(result_hashes));
                 world
+                    .response
+                    .insert(String::from("manager_cycle"), Box::new(result.cycle));
+                world
+                    .response
+                    .insert(String::from("manager_ucycle"), Box::new(result.ucycle));
+                world
             } else {
                 panic!("Invalid state: server job didn't finish");
             }
         }),
+    );
+    steps.then_regex(
+        r#"server returns correct session cycle (\d+) and ucycle (\d+)"#, 
+        |world, ctx| {
+            let expected_cycle = ctx.matches[1].parse::<u64>().unwrap();
+            let expected_ucycle = ctx.matches[2].parse::<u64>().unwrap();
+            let machine_cycle = world
+                .response
+                .get(&String::from("machine_cycle"))
+                .and_then(|x| x.downcast_ref::<u64>())
+                .take()
+                .expect("No u64 type in the result");
+            let machine_ucycle = world
+                .response
+                .get(&String::from("machine_ucycle"))
+                .and_then(|x| x.downcast_ref::<u64>())
+                .take()
+                .expect("No u64 type in the result");
+            let manager_cycle = world
+                .response
+                .get(&String::from("manager_cycle"))
+                .and_then(|x| x.downcast_ref::<u64>())
+                .take()
+                .expect("No u64 type in the result");
+            let manager_ucycle = world
+                .response
+                .get(&String::from("manager_ucycle"))
+                .and_then(|x| x.downcast_ref::<u64>())
+                .take()
+                .expect("No u64 type in the result");
+            assert!(*machine_cycle == expected_cycle);
+            assert!(*machine_ucycle == expected_ucycle);
+            assert!(*manager_cycle == expected_cycle);
+            assert!(*manager_ucycle == expected_ucycle);
+            world
+        }
     );
     steps.then_async("server returns correct machine hashes", 
         t!(|mut world, _ctx| {

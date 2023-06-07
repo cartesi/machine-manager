@@ -12,7 +12,7 @@
 use crate::compare_hashes;
 use crate::steps::new_session::{open_session_with_default_config, open_verification_session, close_sessions};
 use crate::steps::session_get_proof::proof_to_json;
-use crate::steps::session_run::{run_machine, strs_to_uints};
+use crate::steps::session_run::{run_machine, str_to_uints};
 use crate::world::TestWorld;
 use cucumber_rust::{t, Steps};
 use json::object;
@@ -52,31 +52,32 @@ pub fn steps() -> Steps<TestWorld> {
     let mut steps: Steps<TestWorld> = Steps::new();
 
     steps.given_regex_async(
-        r#"a machine manager server with a machine executed for ((\d+,)*\d+) final cycles"#,
+        r#"a machine manager server with a machine executed for ((\d+,)*\d+) final cycles and ((\d+,)*\d+) final ucycles"#,
         t!(|mut world, ctx| {
+            let final_cycles = str_to_uints(&ctx.matches[1]);
+            let final_ucycles = str_to_uints(&ctx.matches[3]);
+            
             let (ret, manager_request) =
                 open_session_with_default_config(&mut world, &ctx, true).await;
             if let Err(e) = ret {
                 panic!("New session request failed: {}", e);
             }
 
-            let ret = run_machine(strs_to_uints(&ctx.matches), &mut world.client_proxy).await;
+            let ret = run_machine(&final_cycles, &final_ucycles, &mut world.client_proxy).await;
             if let session_run_response::RunOneof::Progress(_) = ret.run_oneof.as_ref().unwrap() {
                 panic!("Invalid state: server job didn't finish");
             }
 
             open_verification_session(&mut world, &ctx, manager_request).await;
-            for cycle in strs_to_uints(&ctx.matches) {
-                let request = world.machine_proxy.build_run_request(cycle);
-                if let Err(e) = world
-                    .machine_proxy
-                    .grpc_client
-                    .as_mut()
-                    .unwrap()
-                    .run(request)
-                    .await
-                {
-                    panic!("Unable to make verification run: {}", e);
+            
+            let mut current_cycle = 0;
+            let mut current_ucycle = 0;
+            for cycle_idx in 0..final_cycles.len() {
+                let cycle = final_cycles[cycle_idx];
+                let ucycle = final_ucycles[cycle_idx];
+                match world.machine_proxy.run_to(current_cycle, cycle, current_ucycle, ucycle).await {
+                    Ok(result) => (current_cycle, current_ucycle) = result,
+                    Err(err) => panic!("Unable to make verification run: {}", err),
                 }
             }
 
@@ -85,11 +86,13 @@ pub fn steps() -> Steps<TestWorld> {
     );
 
     steps.when_regex_async(
-        r#"the machine manager server asks machine to step on initial cycle (\d+)"#,
+        r#"the machine manager server asks machine to step on initial cycle (\d+) and initial ucycle (\d+)"#,
         t!(|mut world, ctx| {
+            let cycle = ctx.matches[1].parse::<u64>().unwrap();
+            let ucycle = ctx.matches[2].parse::<u64>().unwrap();
             let request = world
                 .client_proxy
-                .build_new_session_step_request(ctx.matches[1].parse::<u64>().unwrap());
+                .build_new_session_step_request(cycle, ucycle);
             match world
                 .client_proxy
                 .grpc_client
@@ -99,13 +102,9 @@ pub fn steps() -> Steps<TestWorld> {
                 .await
             {
                 Ok(val) => {
-                    let verification_request = world.machine_proxy.build_step_request(request);
                     let verification_response = world
                         .machine_proxy
-                        .grpc_client
-                        .as_mut()
-                        .unwrap()
-                        .step_uarch(verification_request)
+                        .step_uarch(cycle, ucycle, &request)
                         .await;
                     if let Err(e) = verification_response {
                         panic!("Unable to make verification step: {}", e);
@@ -113,7 +112,7 @@ pub fn steps() -> Steps<TestWorld> {
 
                     world.response.insert(
                         String::from("verification_response"),
-                        Box::new(verification_response.unwrap().into_inner()),
+                        Box::new(verification_response.unwrap().2),
                     );
                     world
                         .response
@@ -125,6 +124,23 @@ pub fn steps() -> Steps<TestWorld> {
         }),
     );
 
+    steps.then_regex(
+        r#"machine manager server returns correct session cycle (\d+) and ucycle (\d+)"#, 
+        |world, ctx| {
+            let expected_cycle = ctx.matches[1].parse::<u64>().unwrap();
+            let expected_ucycle = ctx.matches[2].parse::<u64>().unwrap();
+            let response = world
+                .response
+                .get(&String::from("response"))
+                .and_then(|x| x.downcast_ref::<SessionStepResponse>())
+                .take()
+                .expect("No SessionStepResponse type in the result");
+            assert!(response.cycle == expected_cycle);
+            assert!(response.ucycle == expected_ucycle);
+            world
+        }
+    );
+    
     steps.then_async(
         "server returns correct access log",
         t!(|mut world, _ctx| {

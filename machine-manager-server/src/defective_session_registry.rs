@@ -23,6 +23,7 @@ use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::{
     SessionWriteMemoryRequest, SessionReplaceMemoryRangeRequest,
 };
 use machine_manager_server::session::SessionRequest;
+use std::result;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 extern crate machine_manager_server;
@@ -282,6 +283,7 @@ impl MachineManager for MachineManagerServiceDefective {
             Arc::clone(&session_mut),
             &request_info.id,
             &run_request.final_cycles,
+            &run_request.final_ucycles,
         )
         .await
         {
@@ -346,14 +348,17 @@ impl MachineManager for MachineManagerServiceDefective {
                         match session
                             .step_defective(
                                 step_request.initial_cycle,
+                                step_request.initial_ucycle,
                                 &grpc_cartesi_machine::AccessLogType::from(log_type),
                                 request.one_based,
                             )
                             .await
                         {
-                            Ok(log) => {
+                            Ok(result) => {
                                 let response = SessionStepResponse {
-                                        log: Some(cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::AccessLog::from(&log))
+                                        log: Some(cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::AccessLog::from(&result.2)),
+                                        cycle: result.0,
+                                        ucycle: result.1,
                                     };
                                 MachineManagerService::clear_request(&mut session);
                                 log::info!(
@@ -372,7 +377,7 @@ impl MachineManager for MachineManagerServiceDefective {
                                 log::error!("{}", &error_message);
                                 return Err(MachineManagerService::deduce_tonic_error_type(
                                     &err.to_string(),
-                                    "unexpected session cycle, current cycle is",
+                                    "unexpected requested",
                                     &error_message,
                                 ));
                             }
@@ -458,7 +463,7 @@ impl MachineManager for MachineManagerServiceDefective {
                 );
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .read_mem(read_request.cycle, position.address, position.length)
+                    .read_mem(read_request.cycle, read_request.ucycle, position.address, position.length)
                     .await
                 {
                     Ok(data) => {
@@ -484,7 +489,7 @@ impl MachineManager for MachineManagerServiceDefective {
                         log::error!("{}", &error_message);
                         return Err(MachineManagerService::deduce_tonic_error_type(
                             &err.to_string(),
-                            "unexpected session cycle, current cycle is",
+                            "unexpected requested",
                             &error_message,
                         ));
                     }
@@ -517,7 +522,7 @@ impl MachineManager for MachineManagerServiceDefective {
                MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
 
               match session
-              .replace_memory_range(replace_request.cycle, &range)
+              .replace_memory_range(replace_request.cycle, replace_request.ucycle, &range)
                     .await
                 {
                     Ok(()) => {
@@ -538,7 +543,7 @@ impl MachineManager for MachineManagerServiceDefective {
                         log::error!("{}", &error_message);
                         return Err(MachineManagerService::deduce_tonic_error_type(
                             &err.to_string(),
-                            "unexpected session cycle, current cycle is",
+                            "unexpected requested",
                             &error_message,
                         ));
                     }
@@ -574,7 +579,7 @@ impl MachineManager for MachineManagerServiceDefective {
             Some(position) => {
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .write_mem(write_request.cycle, position.address, position.data)
+                    .write_mem(write_request.cycle, write_request.ucycle, position.address, position.data)
                     .await
                 {
                     Ok(()) => {
@@ -595,7 +600,7 @@ impl MachineManager for MachineManagerServiceDefective {
                         log::error!("{}", &error_message);
                         return Err(MachineManagerService::deduce_tonic_error_type(
                             &err.to_string(),
-                            "unexpected session cycle, current cycle is",
+                            "unexpected requested",
                             &error_message,
                         ));
                     }
@@ -629,7 +634,7 @@ impl MachineManager for MachineManagerServiceDefective {
             Some(target) => {
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .get_proof(proof_request.cycle, target.address, target.log2_size)
+                    .get_proof(proof_request.cycle, proof_request.ucycle, target.address, target.log2_size)
                     .await
                 {
                     Ok(result) => {
@@ -650,7 +655,7 @@ impl MachineManager for MachineManagerServiceDefective {
                         log::error!("{}", &error_message);
                         return Err(MachineManagerService::deduce_tonic_error_type(
                             &err.to_string(),
-                            "unexpected session cycle, current cycle is",
+                            "unexpected requested",
                             &error_message,
                         ));
                     }
