@@ -13,11 +13,33 @@ Feature: SessionGetProof feature
 
     Scenario Outline: asking for proofs with different parameters
         Given machine manager server is up
-        And a machine manager server with a machine executed for <cycle> final cycles
-        When the machine manager server asks machine for proof on cycle <cycle> for address <address> with log2_size <size>
+        And a machine manager server with a machine executed for <cycle> final cycles and <ucycle> final ucycles
+        When the machine manager server asks machine for proof on cycle <cycle> and ucycle <ucycle> for address <address> with log2_size <size>
         Then server returns correct proof
 
         Examples:
-            | cycle |        address      | size |
-            |  30   |          288        |  3   |
-            |  30   |          288        |  4   |
+            | cycle | ucycle |  address  | size |
+            |  30   |   60   |    288    |  3   |
+            |  30   |   60   |    288    |  4   |
+
+    Scenario Outline: asking for proof on invalid cycle
+
+        Given machine manager server is up
+        And a machine manager server with a machine executed for 20 final cycles and 15 final ucycles
+        When the machine manager server asks machine for proof on cycle <cycle> and ucycle 15 for address <address> with log2_size <size>
+        Then machine manager server returns an InvalidArgument error
+
+        Examples:
+            | cycle | address| size |
+            |   5   |   288  |  3   |
+
+     Scenario Outline: asking for proof on invalid cycle
+
+        Given machine manager server is up
+        And a machine manager server with a machine executed for 20 final cycles and 15 final ucycles
+        When the machine manager server asks machine for proof on cycle 20 and ucycle <ucycle> for address <address> with log2_size <size>
+        Then machine manager server returns an InvalidArgument error
+
+        Examples:
+            | ucycle | address| size |
+            |   5    |   288  |  3   |

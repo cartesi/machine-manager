@@ -16,11 +16,12 @@ use async_mutex::Mutex;
 use std::sync::Arc;
 
 use crate::server_manager::ServerManager;
-use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::{Csr, RunResponse};
+use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::{Csr, RunResponse, RunUarchResponse};
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::SessionRunProgress;
 use generic_array::GenericArray;
 use grpc_cartesi_machine::{
-    GrpcCartesiMachineClient, MachineConfig, MachineRuntimeConfig, MerkleTreeProof, MemoryRangeConfig
+    CM_UARCH_BREAK_REASON_REACHED_TARGET_CYCLE, CM_UARCH_BREAK_REASON_HALTED,
+    GrpcCartesiMachineClient, MachineConfig, MachineRuntimeConfig, MerkleTreeProof,
 };
 use sha3::{Digest, Sha3_256};
 use std::fmt::Debug;
@@ -72,6 +73,7 @@ pub struct ExecutionProgress {
     pub application_progress: u64,
     pub updated_at: u64,
     pub cycle: u64,
+    pub ucycle: u64,
     pub halted: bool,
 }
 
@@ -82,6 +84,7 @@ impl ExecutionProgress {
             application_progress: 0,
             updated_at: chrono::Utc::now().timestamp() as u64,
             cycle: 0,
+            ucycle: 0,
             halted: false,
         }
     }
@@ -133,6 +136,8 @@ struct RunTask {
     request_id: String,
     /// Final cycles of the run task
     final_cycles: Vec<u64>,
+    /// Final ucycles of the run task
+    final_ucycles: Vec<u64>,
     /// Current progress
     progress: ExecutionProgress,
     /// Hashes of the machine when it reaches final cycles
@@ -142,11 +147,12 @@ struct RunTask {
 }
 
 impl RunTask {
-    fn new(request_id: &str, final_cycles: &[u64]) -> Self {
+    fn new(request_id: &str, final_cycles: &[u64], final_ucycles: &[u64]) -> Self {
         RunTask {
             id: format!("{:?}", final_cycles),
             request_id: request_id.to_string(),
             final_cycles: Vec::from(final_cycles),
+            final_ucycles: Vec::from(final_ucycles),
             progress: ExecutionProgress::new(),
             hashes: Vec::new(),
             summaries: Vec::new(),
@@ -174,6 +180,8 @@ pub struct Session {
     state: SessionState,
     /// Current session cycle
     cycle: u64,
+    /// Current session ucycle
+    ucycle: u64,
     /// Last performed snapshot cycle is on cycle snapshot_cycle
     snapshot_cycle: Option<u64>,
     /// Machine configuration used to create Cartesi server machine
@@ -336,6 +344,7 @@ impl Session {
             machine_runtime_config: Arc::new(runtime_config.clone()),
             server_manager,
             cycle: 0,
+            ucycle: 0,
             snapshot_cycle: None,
             current_job: None,
         };
@@ -363,6 +372,7 @@ impl Session {
             machine_runtime_config: Arc::new(runtime_config.clone()),
             server_manager,
             cycle: 0,
+            ucycle: 0,
             snapshot_cycle: None,
             current_job: None,
         };
@@ -421,9 +431,56 @@ impl Session {
         grpc_cartesi_machine.get_root_hash().await
     }
 
-    /// Run session machine instance one CPU step forward. Functon
-    /// is for internal session usage
-    async fn run_step(
+    async fn reset_uarch_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.cycle += 1;
+        self.ucycle = 0;
+
+        let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
+        if let Err(err) = grpc_cartesi_machine.reset_uarch_state().await {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "failed to reset uarch state {}", err
+            ))));
+        }
+
+        return Ok(())
+    }
+
+    async fn run_to_ucycle(
+        &mut self,
+        final_ucycle: u64,
+    ) -> Result<RunUarchResponse, Box<dyn std::error::Error>> {
+        if final_ucycle < self.ucycle {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "machine is already at ucycle {}, requested ucycle {}",
+                self.ucycle, final_ucycle
+            ))));
+        }
+
+        log::debug!(
+            "running machine session id {} current ucycle/requested ucycle {}/{} ->",
+            &self.id,
+            self.ucycle,
+            final_ucycle,
+        );
+
+        let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
+        let result = grpc_cartesi_machine.run_uarch(final_ucycle).await?;
+            
+        if result.halt_flag == CM_UARCH_BREAK_REASON_HALTED {
+            self.reset_uarch_state().await?;
+        } else if result.halt_flag == CM_UARCH_BREAK_REASON_REACHED_TARGET_CYCLE {
+            self.ucycle = result.cycle;
+        } else {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "unknown vlaue of RunUarchResponse.halt_flat {}", result.halt_flag
+            ))));
+        }
+        Ok(result)
+    }
+
+    /// Run machine to a particular cycle. If current cycle is bigger than
+    /// requested cycle, return error. Function for internal session usage.
+    async fn run_to_cycle(
         &mut self,
         final_cycle: u64,
     ) -> Result<RunResponse, Box<dyn std::error::Error>> {
@@ -433,61 +490,67 @@ impl Session {
                 self.cycle, final_cycle
             ))));
         }
-        // Perform running in steps of RUN_STEP cycles
-        let mut result = Default::default();
-        for _current_step in 1..=RUN_STEPS_AT_ONCE {
-            let step = if final_cycle > self.cycle + RUN_STEP {
-                self.cycle + RUN_STEP
-            } else {
-                final_cycle
-            };
-            {
-                log::debug!("running session id=\"{}\" to cycle {}", &self.id, step);
-                let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
-                result = grpc_cartesi_machine.run(step).await?;
-            }
-            self.cycle = result.mcycle;
-            // Check if machine instance is halted and set session state flag accordingly
-            if result.iflags_h {
-                self.state = SessionState::Halted(result.mcycle);
-            } else {
-                self.state = SessionState::Active;
-            }
 
-            if final_cycle == self.cycle || result.iflags_h {
-                break;
-            }
-        }
-        Ok(result)
-    }
-
-    /// Run machine to a particular cycle. If current cycle is bigger than
-    /// requested cycle, return error. Function for internal session usage.
-    async fn run_to_cycle(
-        &mut self,
-        requested_cycle: u64,
-    ) -> Result<RunResponse, Box<dyn std::error::Error>> {
         log::debug!(
             "running machine session id {} current cycle/requested cycle {}/{} ->",
             &self.id,
             self.cycle,
-            requested_cycle
+            final_cycle
         );
-        if requested_cycle >= self.cycle {
-            //Run machine to requested cycle, return final Run response
-            loop {
-                let result = self.run_step(requested_cycle).await?;
-                if result.mcycle == requested_cycle || result.iflags_h {
+
+        // Outer loop is necessary in case of long (huge value of final_cycle) run.
+        loop {
+            // Perform running in steps of RUN_STEP cycles
+            let mut result = Default::default();
+            for _current_step in 1..=RUN_STEPS_AT_ONCE {
+                let step = if final_cycle > self.cycle + RUN_STEP {
+                    self.cycle + RUN_STEP
+                } else {
+                    final_cycle
+                };
+                {
+                    log::debug!("running machine session id=\"{}\" to cycle {}", &self.id, step);
+                    let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
+                    result = grpc_cartesi_machine.run(step).await?;
+                }
+                self.cycle = result.mcycle;
+                // Check if machine instance is halted and set session state flag accordingly
+                if result.iflags_h {
+                    self.state = SessionState::Halted(result.mcycle);
+                } else {
+                    self.state = SessionState::Active;
+                }
+
+                if final_cycle == self.cycle || result.iflags_h {
                     return Ok(result);
                 }
-            }
-        } else {
-            Err(Box::new(CartesiSessionError::new(
-                "internal execution error, requested cycle is smaller than current cycle",
-            )))
+            }    
         }
     }
 
+    async fn run_to(
+        &mut self,
+        requested_cycle: u64,
+        requested_ucycle: u64,
+    ) -> Result<(RunResponse, RunUarchResponse), Box<dyn std::error::Error>> {
+        if requested_cycle < self.cycle && requested_ucycle < self.ucycle {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "requested cycle/ucycle {}/{} is smaller than current one {}/{}",
+                requested_cycle, requested_ucycle, self.cycle, self.ucycle,
+            ))))
+        }
+        
+        // Run machine to the end of current cycle, if necessary.
+        if requested_cycle > self.cycle && self.ucycle > 0 {
+            self.run_to_ucycle(u64::MAX).await?;
+        }
+        
+        // Run machine to requested cycle and ucycle.
+        let resp = self.run_to_cycle(requested_cycle).await?;
+        let uarch_resp = self.run_to_ucycle(requested_ucycle).await?;
+
+        Ok((resp, uarch_resp))
+    }
 
     /// Perform snapshot of machine instance on remote Cartesi machine emulator server
     /// On Cartesi machine server snapshot is implemented by forking process, and
@@ -626,6 +689,7 @@ impl Session {
         session_mut: Arc<Mutex<Session>>,
         request_id: &str,
         final_cycles: &[u64],
+        final_ucycles: &[u64]
     ) -> Result<SessionRunProgress, Box<dyn std::error::Error>> {
         log::debug!("got run request for final cycles {:?}", final_cycles);
         let mut session = session_mut.lock().await;
@@ -635,7 +699,20 @@ impl Session {
                 &session.id
             ))));
         }
+        if final_ucycles.is_empty() {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "run operation invalid final ucycles list for session id {}",
+                &session.id
+            ))));
+        }
+        if final_cycles.len() != final_ucycles.len() {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "number of final cycles does not equal to number of final ucycles for session id {}",
+                &session.id
+            ))));
+        }
         let first_job_cycle = final_cycles[0];
+        let first_job_ucycle: u64 = final_ucycles[0];
         // Check current snapshot cycle, perform snapshot
         // Snapshot must exist to execute run job, one is taken when machine is created
         if let Some(snapshot_cycle) = session.snapshot_cycle {
@@ -647,8 +724,8 @@ impl Session {
                     // Perform rollback and run to starting job cycle, then do a snapshot again
                     session.rollback().await?;
                 }
-                let initial_run_response = session.run_to_cycle(first_job_cycle).await?;
-                if initial_run_response.iflags_h {
+                let initial_run_response = session.run_to(first_job_cycle, first_job_ucycle).await?;
+                if initial_run_response.0.iflags_h {
                     log::warn!("warning: machine in session id=\"{}\" halted while trying to reach initial cycle", &session.id);
                 }
                 if perform_snapshot {
@@ -670,16 +747,17 @@ impl Session {
 
                     session.current_job = Some(Job {
                         job_task: {
-                            let mut new_run_task = RunTask::new(request_id, final_cycles);
+                            let mut new_run_task = RunTask::new(request_id, final_cycles, final_ucycles);
                             new_run_task.progress = ExecutionProgress {
                                 application_progress: 0,
                                 progress: 100,
-                                cycle: initial_run_response.mcycle,
+                                cycle: session.cycle,
+                                ucycle: session.ucycle,
                                 updated_at: chrono::Utc::now().timestamp() as u64,
                                 halted: false,
                             };
                             new_run_task.hashes.push(current_root_hash);
-                            new_run_task.summaries.push(initial_run_response);
+                            new_run_task.summaries.push(initial_run_response.0);
                             Arc::new(Mutex::new(new_run_task))
                         },
                         job_handle: None,
@@ -687,6 +765,7 @@ impl Session {
 
                     return Ok(SessionRunProgress {
                         cycle: session.cycle,
+                        ucycle: session.ucycle,
                         progress: 100,
                         updated_at: chrono::Utc::now().timestamp() as u64,
                         application_progress: 0,
@@ -694,10 +773,11 @@ impl Session {
                 }
 
                 // Execution of the run job task in separate thread
-                let new_run_task = Arc::new(Mutex::new(RunTask::new(request_id, final_cycles)));
+                let new_run_task = Arc::new(Mutex::new(RunTask::new(request_id, final_cycles, final_ucycles)));
                 // Closure that will run task in separate thread
                 let task_closure = {
                     let task_final_cycles = Vec::from(final_cycles);
+                    let task_final_ucycles = Vec::from(final_ucycles);
                     let run_task = Arc::clone(&new_run_task);
                     let job_session = Arc::clone(&session_mut);
                     let run_task_id = run_task.lock().await.id.clone();
@@ -726,7 +806,9 @@ impl Session {
                                 panic!("aborting function task id {id} due to cancellation request", id=task_id);
                             };
                             // Actually perform work here
-                            for cycle in task_final_cycles.clone() {
+                            for cycle_idx in 0..task_final_cycles.len() {
+                                let cycle = task_final_cycles[cycle_idx];
+                                let ucycle = task_final_ucycles[cycle_idx];
                                 {
                                     let mut task_session = task_session_mut.lock().await;
                                     //Check if we need to abort
@@ -741,19 +823,20 @@ impl Session {
                                         }
                                     }
                                     // Execute run on remote machine
-                                    match task_session.run_to_cycle(cycle).await {
+                                    match task_session.run_to(cycle, ucycle).await {
                                         Ok(response) => {
                                             let mut current_task = run_task.lock().await;
-                                            let is_halted = response.iflags_h;
-                                            if response.iflags_y {
+                                            let is_halted = response.0.iflags_h;
+                                            if response.0.iflags_y {
                                                 //todo how to calculate application progress?
                                                 //let _cmd = response.tohost[1];
                                                 current_task.progress.application_progress = 0;
                                             }
                                             current_task.progress.progress = (((task_session.cycle-first_cycle) as f32/ total_cycles as f32) * 100.0) as u64;
                                             current_task.progress.cycle = task_session.cycle;
+                                            current_task.progress.ucycle = task_session.ucycle;
                                             current_task.progress.updated_at = chrono::Utc::now().timestamp() as u64;
-                                            current_task.summaries.push(response);
+                                            current_task.summaries.push(response.0);
                                             match task_session.get_root_hash().await {
                                                 Ok(hash) => current_task.hashes.push(hash),
                                                 Err(err) => {
@@ -816,6 +899,7 @@ impl Session {
         let (execution_progress, ..) = session.get_job_progress(request_id).await?;
         Ok(SessionRunProgress {
             cycle: execution_progress.cycle,
+            ucycle: execution_progress.ucycle,
             progress: execution_progress.progress,
             updated_at: execution_progress.updated_at,
             application_progress: execution_progress.application_progress,
@@ -826,6 +910,7 @@ impl Session {
         session_mut: Arc<Mutex<Session>>,
         request_id: &str,
         final_cycles: &[u64],
+        final_ucycles: &[u64],
     ) -> Result<SessionRunProgress, Box<dyn std::error::Error>> {
 
         let mut modified_cycles: Vec<u64> = Vec::new();
@@ -837,13 +922,28 @@ impl Session {
                 modified_cycles.push(*cycle);
             }
         }
+
+        let mut modified_ucycles: Vec<u64> = Vec::new();
+        for ucycle in final_ucycles {
+            if ucycle >= &MAX_CYCLE {
+                modified_ucycles.push(MAX_CYCLE);
+            }
+            else {
+                modified_ucycles.push(*ucycle);
+            }
+        }
         
         log::info!(
-            "Executing defective step.  Desired cycle: {:?}   Used cycle: {:?}",
-            modified_cycles, final_cycles
+            "Executing defective run. Desired cycles: {:?} Used cycles: {:?} Desired ucycles: {:?} Used ucycles: {:?}",
+            final_cycles, modified_cycles, final_ucycles, modified_ucycles, 
         );
 
-        let session_run_result = Session::run(session_mut.clone(), request_id, &modified_cycles);
+        let session_run_result = Session::run(
+            session_mut.clone(),
+            request_id,
+            &modified_cycles,
+            &modified_ucycles
+            );
         
         log::debug!(
             "Finished executing defective step.  Desired cycle: {:?}   Used cycle: {:?}",
@@ -858,6 +958,7 @@ impl Session {
                     application_progress: session_result.application_progress,
                     updated_at: session_result.updated_at,
                     cycle: final_cycles[0],
+                    ucycle: final_ucycles[0],
                 };
 
                 log::debug!(
@@ -876,25 +977,29 @@ impl Session {
     pub async fn step_defective(
         &mut self,
         cycle: u64,
+        ucycle: u64,
         log_type: &grpc_cartesi_machine::AccessLogType,
         one_based: bool,
-    ) -> Result<grpc_cartesi_machine::AccessLog, Box<dyn std::error::Error>> {
+    ) -> Result<(u64, u64, grpc_cartesi_machine::AccessLog), Box<dyn std::error::Error>> {
         let mut modified_cycle = cycle;
-
         if modified_cycle >= MAX_CYCLE {
             modified_cycle = MAX_CYCLE
         }
-
+        let mut modified_ucycle = ucycle;
+        if modified_ucycle >= MAX_CYCLE {
+            modified_ucycle = MAX_CYCLE
+        }
+                
         log::debug!(
-            "Executing defective step.  Desired cycle: {}   Used cycle: {}",
-            modified_cycle, cycle
+            "Executing defective step.  Desired cycle: {} Used cycle: {} Desired ucycle: {} Used ucycle: {}",
+            cycle, modified_cycle, ucycle, modified_ucycle
         );
 
-        let session_step_result = self.step(modified_cycle, log_type, one_based);  
+        let session_step_result = self.step(modified_ucycle, modified_ucycle, log_type, one_based);  
         
         log::debug!(
             "Finished executing defective step.  Desired cycle: {}   Used cycle: {}",
-            modified_cycle, cycle
+            modified_ucycle, ucycle
         );
 
         session_step_result.await
@@ -904,25 +1009,41 @@ impl Session {
     pub async fn step(
         &mut self,
         cycle: u64,
+        ucycle: u64,
         log_type: &grpc_cartesi_machine::AccessLogType,
         one_based: bool,
-    ) -> Result<grpc_cartesi_machine::AccessLog, Box<dyn std::error::Error>> {
+    ) -> Result<(u64, u64, grpc_cartesi_machine::AccessLog), Box<dyn std::error::Error>> {
         if self.cycle != cycle {
             return Err(Box::new(CartesiSessionError::new(&format!(
-                "unexpected session cycle, current cycle is {}",
-                self.cycle
+                "unexpected requested cycle {}, current session cycle is {}",
+                cycle, self.cycle
             ))));
         }
+        if self.ucycle != ucycle {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "unexpected requested ucycle {}, current session ucycle is {}",
+                ucycle, self.ucycle
+            ))));
+        }
+        
         let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
         let log = grpc_cartesi_machine.step(log_type, one_based).await?;
         let halted = grpc_cartesi_machine.read_csr(Csr::HtifIhalt).await?;
-        self.cycle += 1;
+        let halted_uarch = grpc_cartesi_machine.read_csr(Csr::UarchHaltFlag).await?;
+
+        if halted_uarch > 0 {
+            self.reset_uarch_state().await?;
+        } else {
+            self.ucycle += 1;
+        }
+
         if halted > 0 {
             self.state = SessionState::Halted(self.cycle);
         } else {
             self.state = SessionState::Active;
         }
-        Ok(log)
+
+        Ok((self.cycle, self.ucycle, log))
     }
 
     /// Perform store to directory of machine instance on remote Cartesi machine emulator server
@@ -938,6 +1059,7 @@ impl Session {
     pub async fn read_mem(
         &mut self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         length: u64,
     ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
@@ -946,8 +1068,13 @@ impl Session {
             // always returns halted cycle value. Proceed with reading memory
         } else if self.cycle != cycle {
             return Err(Box::new(CartesiSessionError::new(&format!(
-                "unexpected session cycle, current cycle is {}",
-                self.cycle
+                "unexpected requested cycle {}, current session cycle is {}",
+                cycle, self.cycle
+            ))));
+        } else if self.ucycle != ucycle {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "unexpected requested ucycle {}, current session ucycle is {}",
+                ucycle, self.ucycle
             ))));
         }
         let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
@@ -958,13 +1085,19 @@ impl Session {
     pub async fn write_mem(
         &mut self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         data: Vec<u8>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if self.cycle != cycle {
             return Err(Box::new(CartesiSessionError::new(&format!(
-                "unexpected session cycle, current cycle is {}",
-                self.cycle
+                "unexpected requested cycle {}, current session cycle is {}",
+                cycle, self.cycle
+            ))));
+        } else if self.ucycle != ucycle {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "unexpected requested ucycle {}, current session ucycle is {}",
+                ucycle, self.ucycle
             ))));
         }
         let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
@@ -976,12 +1109,18 @@ impl Session {
     pub async fn replace_memory_range(
         &mut self,
         cycle: u64,
+        ucycle: u64,
         range: &cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::MemoryRangeConfig,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if self.cycle != cycle {
             return Err(Box::new(CartesiSessionError::new(&format!(
-                "unexpected session cycle, current cycle is {}",
-                self.cycle
+                "unexpected requested cycle {}, current session cycle is {}",
+                cycle, self.cycle
+            ))));
+        } else if self.ucycle != ucycle {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "unexpected requested ucycle {}, current session ucycle is {}",
+                ucycle, self.ucycle
             ))));
         }
         let grpc_cartesi_machine = self.get_cartesi_machine_client()?;
@@ -993,6 +1132,7 @@ impl Session {
     pub async fn get_proof(
         &mut self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         log2_size: u64,
     ) -> Result<MerkleTreeProof, Box<dyn std::error::Error>> {
@@ -1001,8 +1141,13 @@ impl Session {
             // returns halted cycle proof value. Proceed with reading
         } else if self.cycle != cycle {
             return Err(Box::new(CartesiSessionError::new(&format!(
-                "unexpected session cycle, current cycle is {}",
-                self.cycle
+                "unexpected requested cycle {}, current session cycle is {}",
+                cycle, self.cycle
+            ))));
+        } else if self.ucycle != ucycle {
+            return Err(Box::new(CartesiSessionError::new(&format!(
+                "unexpected requested ucycle {}, current session ucycle is {}",
+                ucycle, self.ucycle
             ))));
         }
         let grpc_cartesi_machine = self.get_cartesi_machine_client()?;

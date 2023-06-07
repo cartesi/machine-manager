@@ -15,6 +15,9 @@ use std::{thread, time};
 use stubs::cartesi_machine::*;
 use stubs::cartesi_machine_manager::*;
 
+pub const CM_UARCH_BREAK_REASON_REACHED_TARGET_CYCLE: u64 = 0;
+pub const CM_UARCH_BREAK_REASON_HALTED: u64 = 1;
+
 pub fn generate_default_machine_config(files_dir: &str) -> MachineConfig {
     MachineConfig {
         processor: Some(ProcessorConfig {
@@ -287,14 +290,15 @@ impl MachineManagerClientProxy {
         }
     }
 
-    pub fn build_new_session_run_request(&self, final_cycles: &Vec<u64>) -> SessionRunRequest {
+    pub fn build_new_session_run_request(&self, final_cycles: &Vec<u64>, final_ucycles: &Vec<u64>) -> SessionRunRequest {
         SessionRunRequest {
             session_id: self.session_id.clone(),
             final_cycles: final_cycles.clone(),
+            final_ucycles: final_ucycles.clone(),
         }
     }
 
-    pub fn build_new_session_step_request(&self, initial_cycle: u64) -> SessionStepRequest {
+    pub fn build_new_session_step_request(&self, initial_cycle: u64, initial_ucycle: u64) -> SessionStepRequest {
         let log_type = Some(AccessLogType {
             proofs: true,
             annotations: true,
@@ -307,6 +311,7 @@ impl MachineManagerClientProxy {
         SessionStepRequest {
             session_id: self.session_id.clone(),
             initial_cycle,
+            initial_ucycle,
             step_params_oneof: Some(session_step_request::StepParamsOneof::StepParams(
                 step_request,
             )),
@@ -316,6 +321,7 @@ impl MachineManagerClientProxy {
     pub fn build_new_session_get_proof_request(
         &self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         log2_size: u64,
     ) -> SessionGetProofRequest {
@@ -324,6 +330,7 @@ impl MachineManagerClientProxy {
         SessionGetProofRequest {
             session_id: self.session_id.clone(),
             cycle,
+            ucycle,
             target: proof_request,
         }
     }
@@ -346,6 +353,7 @@ impl MachineManagerClientProxy {
     pub fn build_new_session_read_memory_request(
         &self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         data_length: u64,
     ) -> SessionReadMemoryRequest {
@@ -357,6 +365,7 @@ impl MachineManagerClientProxy {
         SessionReadMemoryRequest {
             session_id: self.session_id.clone(),
             cycle,
+            ucycle,
             position: read_memory_request,
         }
     }
@@ -364,6 +373,7 @@ impl MachineManagerClientProxy {
     pub fn build_new_session_write_memory_request(
         &self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         data: Vec<u8>,
     ) -> SessionWriteMemoryRequest {
@@ -372,6 +382,7 @@ impl MachineManagerClientProxy {
         SessionWriteMemoryRequest {
             session_id: self.session_id.clone(),
             cycle,
+            ucycle,
             position: write_memory_request,
         }
     }
@@ -401,6 +412,30 @@ impl MachineManagerClientProxy {
         response
     }
 }
+
+
+#[derive(Debug, Default)]
+/// Error type returned from session functions
+struct MachineClientProxyError {
+    message: String,
+}
+
+impl MachineClientProxyError {
+    fn new(message: &str) -> Self {
+        MachineClientProxyError {
+            message: String::from(message),
+        }
+    }
+}
+
+impl std::fmt::Display for MachineClientProxyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "machine client proxy error: {}", &self.message)
+    }
+}
+
+impl std::error::Error for MachineClientProxyError {}
+
 
 #[derive(Default)]
 pub struct MachineClientProxy {
@@ -455,5 +490,178 @@ impl MachineClientProxy {
         manager_request: SessionWriteMemoryRequest,
     ) -> WriteMemoryRequest {
         manager_request.position.unwrap()
+    }
+
+    pub async fn run_to(
+        &mut self,
+        from_cycle: u64,
+        to_cycle: u64,
+        from_ucycle: u64,
+        to_ucycle: u64,
+    ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
+        if to_cycle < from_cycle && to_ucycle < from_ucycle {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "requested cycle/ucycle {}/{} is smaller than current one {}/{}",
+                to_cycle, to_ucycle, from_cycle, from_ucycle,
+            ))))
+        }
+
+        let mut current_cycle = from_cycle;
+        let mut current_ucycle  = from_ucycle;
+
+        // Run machine to the end of current cycle, if necessary.
+        if to_cycle > current_cycle && from_ucycle > 0 {
+            (current_cycle, current_ucycle) = self.run_to_ucycle(current_cycle, current_ucycle, u64::MAX).await?; 
+        }
+
+        // Run machine to requested cycle and ucycle.
+        (current_cycle, current_ucycle) = self.run_to_cycle(current_cycle, current_ucycle, to_cycle).await?;
+        (current_cycle, current_ucycle) = self.run_to_ucycle(current_cycle, current_ucycle, to_ucycle).await?;
+
+        return Ok((current_cycle, current_ucycle));
+    }
+
+    async fn run_to_cycle(
+        &mut self,
+        current_cycle: u64,
+        current_ucycle: u64,
+        to_cycle: u64
+    ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
+        if to_cycle < current_cycle {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "machine is already at cycle {}, requested cycle {}",
+                current_cycle, to_cycle
+            ))));
+        }
+
+        let result = self.grpc_client
+                .as_mut()
+                .unwrap()
+                .run(RunRequest{limit: to_cycle})
+                .await;
+        if result.is_err() {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "failed to run machine to cycle {}", to_cycle
+            ))))
+        }
+
+        let response = result.unwrap().into_inner();
+        return Ok((response.mcycle, current_ucycle));        
+    }
+
+    async fn run_to_ucycle(
+        &mut self,
+        current_cycle: u64,
+        current_ucycle: u64,
+        to_ucycle: u64
+    ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
+        if to_ucycle < current_ucycle {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "machine is already at ucycle {}, requested ucycle {}",
+                current_ucycle, to_ucycle
+            ))));
+        }
+
+        let result = self.grpc_client
+                .as_mut()
+                .unwrap()
+                .run_uarch(RunUarchRequest{limit: to_ucycle})
+                .await;
+        if result.is_err() {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "failed to run machine to ucycle {}", to_ucycle
+            ))))
+        }
+
+        let response = result.unwrap().into_inner();
+        if response.halt_flag == CM_UARCH_BREAK_REASON_HALTED {
+            return self.reset_uarch_state(current_cycle, current_ucycle).await;
+        } else if response.halt_flag == CM_UARCH_BREAK_REASON_REACHED_TARGET_CYCLE {
+            return Ok((current_cycle, response.cycle));
+        } else {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "unknown vlaue of RunUarchResponse.halt_flat {}", response.halt_flag
+            ))));
+        }
+    }
+
+    async fn reset_uarch_state(
+        &mut self,
+        current_cycle: u64,
+        current_ucycle: u64,
+    ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
+        let result = self.grpc_client
+            .as_mut()
+            .unwrap()
+            .reset_uarch_state(Void{})
+            .await;
+        if result.is_err() {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "failed to reset uarch state at cycle {} and ucycle {}",
+                current_cycle,
+                current_ucycle,
+            ))))
+        }
+        return Ok((current_cycle + 1, 0));
+    }
+
+    pub async fn step_uarch(
+        &mut self,
+        current_cycle: u64,
+        current_ucycle: u64,
+        manager_request: &SessionStepRequest,
+    ) -> Result<(u64, u64, StepUarchResponse), Box<dyn std::error::Error>> {
+        if current_cycle != manager_request.initial_cycle {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "unexpected requested cycle, current cycle is {}",
+                current_cycle
+            ))));
+        }    
+        if current_ucycle != manager_request.initial_ucycle {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "unexpected requested ucycle, current ucycle is {}",
+                current_ucycle
+            ))));
+        }
+
+        let session_step_request::StepParamsOneof::StepParams(step_request) =
+            manager_request.step_params_oneof.as_ref().unwrap();
+        let step_result = self.grpc_client
+            .as_mut()
+            .unwrap()
+            .step_uarch(step_request.clone())
+            .await;
+        if step_result.is_err() {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "failed to perform uarch step on cycle {} and ucycle {}",
+                manager_request.initial_cycle,
+                manager_request.initial_ucycle,
+            ))))
+        }
+        let step_response = step_result.unwrap().into_inner();
+
+        let csr_result = self.grpc_client
+            .as_mut()
+            .unwrap()
+            .read_csr(ReadCsrRequest{ csr: 38 })
+            .await;
+        if csr_result.is_err() {
+            return Err(Box::new(MachineClientProxyError::new(&format!(
+                "failed to read csr for cycle {} and ucycle {}",
+                current_cycle,
+                current_ucycle,
+            ))))
+        }
+        let csr_response = csr_result.unwrap().into_inner();
+        
+        let mut new_cycle = current_cycle;
+        let mut new_ucycle = current_ucycle;
+        if csr_response.value > 0 {
+            (new_cycle, new_ucycle) =  self.reset_uarch_state(current_cycle, current_ucycle).await?;
+        } else {
+            new_ucycle += 1;
+        }
+
+        Ok((new_cycle, new_ucycle + 1, step_response))        
     }
 }

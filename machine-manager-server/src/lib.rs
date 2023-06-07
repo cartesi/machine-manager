@@ -137,7 +137,9 @@ impl MachineManagerService {
                             response = SessionRunResponse {
                                 run_oneof: Some(RunOneof::Result(SessionRunResult {
                                     hashes: hashes.iter().map(cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::Hash::from).collect(),
-                                    summaries
+                                    summaries: summaries,
+                                    cycle: progress.cycle,
+                                    ucycle: progress.ucycle,
                                 })),
                             };
                             MachineManagerService::clear_request(&mut session);
@@ -145,6 +147,7 @@ impl MachineManagerService {
                             response = SessionRunResponse {
                                 run_oneof: Some(RunOneof::Progress(SessionRunProgress {
                                     cycle: progress.cycle,
+                                    ucycle: progress.ucycle,
                                     progress: progress.progress,
                                     updated_at: progress.updated_at,
                                     application_progress: progress.application_progress,
@@ -154,7 +157,9 @@ impl MachineManagerService {
                             response = SessionRunResponse {
                                 run_oneof: Some(RunOneof::Result(SessionRunResult {
                                     hashes: hashes.iter().map(cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::Hash::from).collect(),
-                                    summaries
+                                    summaries: summaries,
+                                    cycle: progress.cycle,
+                                    ucycle: progress.ucycle,
                                 })),
                             };
                             MachineManagerService::clear_request(&mut session);
@@ -431,9 +436,10 @@ impl MachineManager for MachineManagerService {
         let request_info = SessionRequest::from(&request);
         let run_request = request.into_inner();
         log::info!(
-            "session id={} received session run request, final_cycles={:?}",
+            "session id={} received session run request, final_cycles={:?}, final_ucycles={:?}",
             &run_request.session_id,
-            &run_request.final_cycles
+            &run_request.final_cycles,
+            &run_request.final_ucycles
         );
         let session_mut = self.find_session(&run_request.session_id).await?;
         if run_request.final_cycles.is_empty() {
@@ -463,6 +469,7 @@ impl MachineManager for MachineManagerService {
             Arc::clone(&session_mut),
             &request_info.id,
             &run_request.final_cycles,
+            &run_request.final_ucycles,
         )
         .await
         {
@@ -527,15 +534,18 @@ impl MachineManager for MachineManagerService {
                         match session
                             .step(
                                 step_request.initial_cycle,
+                                step_request.initial_ucycle,
                                 &grpc_cartesi_machine::AccessLogType::from(log_type),
                                 request.one_based,
                             )
                             .await
                         {
-                            Ok(log) => {
+                            Ok(result) => {
                                 let response = SessionStepResponse {
-                                        log: Some(cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::AccessLog::from(&log))
-                                    };
+                                    log: Some(cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::AccessLog::from(&result.2)),
+                                    cycle: result.0,
+                                    ucycle: result.1,
+                                };
                                 MachineManagerService::clear_request(&mut session);
                                 log::info!(
                                     "session id={} step request executed successfully",
@@ -553,7 +563,7 @@ impl MachineManager for MachineManagerService {
                                 log::error!("{}", &error_message);
                                 return Err(MachineManagerService::deduce_tonic_error_type(
                                     &err.to_string(),
-                                    "unexpected session cycle, current cycle is",
+                                    "unexpected requested",
                                     &error_message,
                                 ));
                             }
@@ -639,7 +649,7 @@ impl MachineManager for MachineManagerService {
                 );
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .read_mem(read_request.cycle, position.address, position.length)
+                    .read_mem(read_request.cycle, read_request.ucycle, position.address, position.length)
                     .await
                 {
                     Ok(data) => {
@@ -665,7 +675,7 @@ impl MachineManager for MachineManagerService {
                         log::error!("{}", &error_message);
                         return Err(MachineManagerService::deduce_tonic_error_type(
                             &err.to_string(),
-                            "unexpected session cycle, current cycle is",
+                            "unexpected requested",
                             &error_message,
                         ));
                     }
@@ -698,7 +708,7 @@ impl MachineManager for MachineManagerService {
             Some(position) => {
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .write_mem(write_request.cycle, position.address, position.data)
+                    .write_mem(write_request.cycle, write_request.ucycle, position.address, position.data)
                     .await
                 {
                     Ok(()) => {
@@ -719,7 +729,7 @@ impl MachineManager for MachineManagerService {
                         log::error!("{}", &error_message);
                         return Err(MachineManagerService::deduce_tonic_error_type(
                             &err.to_string(),
-                            "unexpected session cycle, current cycle is",
+                            "unexpected requested",
                             &error_message,
                         ));
                     }
@@ -752,7 +762,7 @@ impl MachineManager for MachineManagerService {
                MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
 
               match session
-              .replace_memory_range(replace_request.cycle, &range)
+              .replace_memory_range(replace_request.cycle, replace_request.ucycle, &range)
                     .await
                 {
                     Ok(()) => {
@@ -773,7 +783,7 @@ impl MachineManager for MachineManagerService {
                         log::error!("{}", &error_message);
                         return Err(MachineManagerService::deduce_tonic_error_type(
                             &err.to_string(),
-                            "unexpected session cycle, current cycle is",
+                            "unexpected requested",
                             &error_message,
                         ));
                     }
@@ -807,7 +817,7 @@ impl MachineManager for MachineManagerService {
             Some(target) => {
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .get_proof(proof_request.cycle, target.address, target.log2_size)
+                    .get_proof(proof_request.cycle, proof_request.ucycle, target.address, target.log2_size)
                     .await
                 {
                     Ok(result) => {
@@ -828,7 +838,7 @@ impl MachineManager for MachineManagerService {
                         log::error!("{}", &error_message);
                         return Err(MachineManagerService::deduce_tonic_error_type(
                             &err.to_string(),
-                            "unexpected session cycle, current cycle is",
+                            "unexpected requested",
                             &error_message,
                         ));
                     }

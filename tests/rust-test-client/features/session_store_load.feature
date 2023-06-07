@@ -16,5 +16,5 @@ Feature: SessionStoreLoad feature
         And a pristine machine manager server session
         When asking machine manager server to store the machine in a directory /stored_machine
         Then machine manager server is able to load machine from this directory correctly
-        And machine manager server is able to execute this machine for 60 cycles
+        And machine manager server is able to execute this machine for 60 cycles and 150 ucycles
         And server returns correct machine hashes
