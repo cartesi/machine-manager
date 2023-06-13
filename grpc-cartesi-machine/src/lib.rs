@@ -26,6 +26,9 @@ use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::*;
 use conversions::*;
 use tonic::Response;
 
+pub const CM_UARCH_BREAK_REASON_REACHED_TARGET_CYCLE: u64 = 0;
+pub const CM_UARCH_BREAK_REASON_HALTED: u64 = 1;
+
 #[derive(Debug, Default)]
 struct GrpcCartesiMachineError {
     message: String,
@@ -706,6 +709,20 @@ impl GrpcCartesiMachineClient {
         Ok(response.into_inner())
     }
 
+    /// Run remote machine to maximum limit ucycle
+    pub async fn run_uarch(&mut self, limit: u64) -> Result<RunUarchResponse, Box<dyn std::error::Error>> {
+        let request = RunUarchRequest { limit };
+        let response: Response<RunUarchResponse> = self.client.run_uarch(request).await?;
+        Ok(response.into_inner())
+    }
+
+    // Reset state of uarch machine
+    pub async fn reset_uarch_state(&mut self) -> Result<Void, Box<dyn std::error::Error>> {
+        let request = tonic::Request::new(Void {});
+        self.client.reset_uarch_state(request).await?;
+        Ok(Void {})
+    }
+
     /// Serialize entire remote machine state to directory on cartesi machine server host
     pub async fn store(&mut self, directory: &str) -> Result<Void, Box<dyn std::error::Error>> {
         let request = StoreRequest {
@@ -744,7 +761,7 @@ impl GrpcCartesiMachineClient {
     }
 
     /// Runs the remote machine for one cycle logging all accesses to the state
-    pub async fn step(
+    pub async fn step_uarch(
         &mut self,
         log_type: &AccessLogType,
         one_based: bool,
