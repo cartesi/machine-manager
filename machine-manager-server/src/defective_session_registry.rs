@@ -282,6 +282,7 @@ impl MachineManager for MachineManagerServiceDefective {
             Arc::clone(&session_mut),
             &request_info.id,
             &run_request.final_cycles,
+            &run_request.final_ucycles,
         )
         .await
         {
@@ -346,6 +347,7 @@ impl MachineManager for MachineManagerServiceDefective {
                         match session
                             .step_defective(
                                 step_request.initial_cycle,
+                                step_request.initial_ucycle,
                                 &grpc_cartesi_machine::AccessLogType::from(log_type),
                                 request.one_based,
                             )
@@ -458,7 +460,7 @@ impl MachineManager for MachineManagerServiceDefective {
                 );
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .read_mem(read_request.cycle, position.address, position.length)
+                    .read_mem(read_request.cycle, read_request.ucycle, position.address, position.length)
                     .await
                 {
                     Ok(data) => {
@@ -517,7 +519,7 @@ impl MachineManager for MachineManagerServiceDefective {
                MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
 
               match session
-              .replace_memory_range(replace_request.cycle, &range)
+              .replace_memory_range(replace_request.cycle, replace_request.ucycle, &range)
                     .await
                 {
                     Ok(()) => {
@@ -574,7 +576,7 @@ impl MachineManager for MachineManagerServiceDefective {
             Some(position) => {
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .write_mem(write_request.cycle, position.address, position.data)
+                    .write_mem(write_request.cycle, write_request.ucycle, position.address, position.data)
                     .await
                 {
                     Ok(()) => {
@@ -629,7 +631,7 @@ impl MachineManager for MachineManagerServiceDefective {
             Some(target) => {
                 MachineManagerService::check_and_set_new_request(&mut session, &request_info)?;
                 match session
-                    .get_proof(proof_request.cycle, target.address, target.log2_size)
+                    .get_proof(proof_request.cycle, proof_request.ucycle, target.address, target.log2_size)
                     .await
                 {
                     Ok(result) => {

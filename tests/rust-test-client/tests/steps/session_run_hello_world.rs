@@ -50,6 +50,16 @@ pub fn steps() -> Steps<TestWorld> {
             world
         },
     );
+    steps.given_regex(
+        r#"the ucycles array ((\d+,)*\d+) to run the machine"#,
+        |mut world, ctx| {
+            world.response.insert(
+                String::from("exec_ucycles"),
+                Box::new(strs_to_uints(&ctx.matches)),
+            );
+            world
+        },
+    );
     steps.when_async(
         "client asks server to run hello world session",
         t!(|mut world, _ctx| {

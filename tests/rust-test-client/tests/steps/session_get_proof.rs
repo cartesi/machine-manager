@@ -35,12 +35,14 @@ pub fn steps() -> Steps<TestWorld> {
     let mut steps: Steps<TestWorld> = Steps::new();
 
     steps.when_regex_async(
-        r#"the machine manager server asks machine for proof on cycle (\d+) for address (\d+) with log2_size (\d+)"#,
+        r#"the machine manager server asks machine for proof on cycle (\d+) and ucycle (\d+) for address (\d+) with log2_size (\d+)"#,
     t!(|mut world, ctx| {
         let request = world.client_proxy.build_new_session_get_proof_request(
             ctx.matches[1].parse::<u64>().unwrap(),
             ctx.matches[2].parse::<u64>().unwrap(),
-            ctx.matches[3].parse::<u64>().unwrap());
+            ctx.matches[3].parse::<u64>().unwrap(),
+            ctx.matches[4].parse::<u64>().unwrap());
+        eprint!("boom {}, {}", request.cycle, request.ucycle);
         match world.client_proxy.grpc_client.as_mut().unwrap().session_get_proof(request.clone()).await {
             Ok(val) => {
                 let verification_request = world.machine_proxy.build_get_proof_request(request);

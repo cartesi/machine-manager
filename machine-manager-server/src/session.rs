@@ -504,7 +504,7 @@ impl Session {
         );
 
         let mut resp: RunResponse = Default::default();
-        let mut uarchResp: RunUarchResponse = Default::default();
+        let mut uarch_resp: RunUarchResponse = Default::default();
 
         // Check if we need to finish ucycle run.
         if requested_cycle > 0 && self.ucycle > 0 {
@@ -523,12 +523,12 @@ impl Session {
         // Run to requested ucycle if it is requested.
         if requested_ucycle > 0 {
             match self.run_to_ucycle(requested_ucycle).await {
-                Ok(r) => uarchResp = r,
+                Ok(r) => uarch_resp = r,
                 Err(err) => return Err(err)
             }
         }
 
-        Ok((resp, uarchResp))
+        Ok((resp, uarch_resp))
     }
 
 
@@ -999,7 +999,7 @@ impl Session {
         let log = grpc_cartesi_machine.step_uarch(log_type, one_based).await?;
         let halted = grpc_cartesi_machine.read_csr(Csr::HtifIhalt).await?;
         if halted > 0 {
-            self.reset_uarch_state();
+            self.reset_uarch_state().await;
             self.state = SessionState::Halted(self.cycle);
         } else {
             self.ucycle += 1;

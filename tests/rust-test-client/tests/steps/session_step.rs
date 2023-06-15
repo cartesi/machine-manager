@@ -52,7 +52,7 @@ pub fn steps() -> Steps<TestWorld> {
     let mut steps: Steps<TestWorld> = Steps::new();
 
     steps.given_regex_async(
-        r#"a machine manager server with a machine executed for ((\d+,)*\d+) final cycles"#,
+        r#"a machine manager server with a machine executed for ((\d+,)*\d+) final cycles and ((\d+,)*\d+) final ucycles"#,
         t!(|mut world, ctx| {
             let (ret, manager_request) =
                 open_session_with_default_config(&mut world, &ctx, true).await;
@@ -60,14 +60,16 @@ pub fn steps() -> Steps<TestWorld> {
                 panic!("New session request failed: {}", e);
             }
 
-            let ret = run_machine(strs_to_uints(&ctx.matches), &mut world.client_proxy).await;
+            let cycles = strs_to_uints(&ctx.matches[1]);
+            let ucycles = strs_to_uints(&ctx.matches[3]);
+            let ret = run_machine(cycles.clone(), ucycles.clone(), &mut world.client_proxy).await;
             if let session_run_response::RunOneof::Progress(_) = ret.run_oneof.as_ref().unwrap() {
                 panic!("Invalid state: server job didn't finish");
             }
 
             open_verification_session(&mut world, &ctx, manager_request).await;
-            for cycle in strs_to_uints(&ctx.matches) {
-                let request = world.machine_proxy.build_run_request(cycle);
+            for idx in 1..cycles.len() {
+                let request = world.machine_proxy.build_run_request(cycles[idx]);
                 if let Err(e) = world
                     .machine_proxy
                     .grpc_client
@@ -78,6 +80,18 @@ pub fn steps() -> Steps<TestWorld> {
                 {
                     panic!("Unable to make verification run: {}", e);
                 }
+
+                let uarch_request = world.machine_proxy.build_run_uarch_request(ucycles[idx]);
+                if let Err(e) = world
+                    .machine_proxy
+                    .grpc_client
+                    .as_mut()
+                    .unwrap()
+                    .run_uarch(uarch_request)
+                    .await
+                {
+                    panic!("Unable to make verification run uarch: {}", e);
+                }
             }
 
             world
@@ -85,11 +99,14 @@ pub fn steps() -> Steps<TestWorld> {
     );
 
     steps.when_regex_async(
-        r#"the machine manager server asks machine to step on initial cycle (\d+)"#,
+        r#"the machine manager server asks machine to step on initial cycle (\d+) and ucycle (\d+)"#,
         t!(|mut world, ctx| {
             let request = world
                 .client_proxy
-                .build_new_session_step_request(ctx.matches[1].parse::<u64>().unwrap());
+                .build_new_session_step_request(
+                    ctx.matches[1].parse::<u64>().unwrap(),
+                    ctx.matches[2].parse::<u64>().unwrap()
+                );
             match world
                 .client_proxy
                 .grpc_client

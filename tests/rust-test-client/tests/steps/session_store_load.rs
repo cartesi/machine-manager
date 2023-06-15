@@ -77,17 +77,21 @@ pub fn steps() -> Steps<TestWorld> {
     );
 
     steps.then_regex_async(
-        r#"machine manager server is able to execute this machine for (\d+) cycles"#,
+        r#"machine manager server is able to execute this machine for (\d+) cycles and (\d+) ucycles"#,
         t!(|mut world, ctx| {
             let ret = run_machine(
                 vec![ctx.matches[1].parse::<u64>().unwrap()],
+                vec![ctx.matches[2].parse::<u64>().unwrap()],
                 &mut world.client_proxy,
             )
             .await;
             if let session_run_response::RunOneof::Result(result) = ret.run_oneof.as_ref().unwrap()
             {
-                get_verification_hashes(&mut world, vec![ctx.matches[1].parse::<u64>().unwrap()])
-                    .await;
+                get_verification_hashes(
+                    &mut world,
+                    vec![ctx.matches[1].parse::<u64>().unwrap()],
+                    vec![ctx.matches[2].parse::<u64>().unwrap()]
+                ).await;
                 let result_hashes: Vec<Hash> = result.hashes.clone();
                 world
                     .response

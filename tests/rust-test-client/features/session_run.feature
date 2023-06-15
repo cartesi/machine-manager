@@ -15,6 +15,7 @@ Feature: SessionRun feature
         Given machine manager server is up
         And a pristine machine manager server session
         And the cycles array 0,15,30,45,60 to run the machine
+        And the ucycles array 0,0,0,0,0 to run the machine
         When client asks server to run session
         Then server returns correct machine hashes
 
@@ -25,8 +26,9 @@ Feature: SessionRun feature
 
         Given machine manager server is up
         And a pristine machine manager server session
-        And the machine executed with cycles 0,30,60
+        And the machine executed with cycles 0,30,60 and ucycles 0,0,0
         And the cycles array 15,30,45 to run the machine
+        And the ucycles array 0,0,0 to run the machine
         When client asks server to run session
         Then server returns correct machine hashes
 
@@ -37,8 +39,9 @@ Feature: SessionRun feature
 
         Given machine manager server is up
         And a pristine machine manager server session
-        And the machine executed with cycles 0,30,60
+        And the machine executed with cycles 0,30,60 and ucycles 0,0,0
         And the cycles array 1,5,10 to run the machine
+        And the ucycles array 0,0,0 to run the machine
         When client asks server to run session
         Then server returns correct machine hashes
 
@@ -48,8 +51,9 @@ Feature: SessionRun feature
 
         Given machine manager server is up
         And a pristine machine manager server session
-        And the machine executed with cycles 0,30,60
+        And the machine executed with cycles 0,30,60 and ucycles 0,0,0
         And the cycles array 15 to run the machine
+        And the ucycles array 0 to run the machine
         When client asks server to run session
         Then server returns correct machine hashes
 
@@ -57,5 +61,6 @@ Feature: SessionRun feature
         Given machine manager server is up
         And a pristine machine manager server session
         And the cycles array 500000000 to run the machine
+        And the ucycles array 0 to run the machine
         When client asks server to run session
         Then server returns correct machine hashes

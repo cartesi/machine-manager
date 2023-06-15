@@ -287,15 +287,15 @@ impl MachineManagerClientProxy {
         }
     }
 
-    pub fn build_new_session_run_request(&self, final_cycles: &Vec<u64>) -> SessionRunRequest {
+    pub fn build_new_session_run_request(&self, final_cycles: &Vec<u64>, final_ucycles: &Vec<u64>) -> SessionRunRequest {
         SessionRunRequest {
             session_id: self.session_id.clone(),
             final_cycles: final_cycles.clone(),
-            final_ucycles: vec![],
+            final_ucycles: final_ucycles.clone(),
         }
     }
 
-    pub fn build_new_session_step_request(&self, initial_cycle: u64) -> SessionStepRequest {
+    pub fn build_new_session_step_request(&self, initial_cycle: u64, initial_ucycle: u64) -> SessionStepRequest {
         let log_type = Some(AccessLogType {
             proofs: true,
             annotations: true,
@@ -308,7 +308,7 @@ impl MachineManagerClientProxy {
         SessionStepRequest {
             session_id: self.session_id.clone(),
             initial_cycle,
-            initial_ucycle: 0,
+            initial_ucycle,
             step_params_oneof: Some(session_step_request::StepParamsOneof::StepParams(
                 step_request,
             )),
@@ -318,6 +318,7 @@ impl MachineManagerClientProxy {
     pub fn build_new_session_get_proof_request(
         &self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         log2_size: u64,
     ) -> SessionGetProofRequest {
@@ -326,7 +327,7 @@ impl MachineManagerClientProxy {
         SessionGetProofRequest {
             session_id: self.session_id.clone(),
             cycle,
-            ucycle: 0,
+            ucycle,
             target: proof_request,
         }
     }
@@ -349,6 +350,7 @@ impl MachineManagerClientProxy {
     pub fn build_new_session_read_memory_request(
         &self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         data_length: u64,
     ) -> SessionReadMemoryRequest {
@@ -360,6 +362,7 @@ impl MachineManagerClientProxy {
         SessionReadMemoryRequest {
             session_id: self.session_id.clone(),
             cycle,
+            ucycle,
             position: read_memory_request,
         }
     }
@@ -367,6 +370,7 @@ impl MachineManagerClientProxy {
     pub fn build_new_session_write_memory_request(
         &self,
         cycle: u64,
+        ucycle: u64,
         address: u64,
         data: Vec<u8>,
     ) -> SessionWriteMemoryRequest {
@@ -375,7 +379,7 @@ impl MachineManagerClientProxy {
         SessionWriteMemoryRequest {
             session_id: self.session_id.clone(),
             cycle,
-            ucycle: 0,
+            ucycle,
             position: write_memory_request,
         }
     }
@@ -428,6 +432,10 @@ impl MachineClientProxy {
 
     pub fn build_run_request(&self, limit: u64) -> RunRequest {
         RunRequest { limit }
+    }
+
+    pub fn build_run_uarch_request(&self, limit: u64) -> RunUarchRequest {
+        RunUarchRequest { limit }
     }
 
     pub fn build_step_request(&self, manager_request: SessionStepRequest) -> StepUarchRequest {

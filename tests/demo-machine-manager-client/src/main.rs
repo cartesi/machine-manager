@@ -222,7 +222,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let request = tonic::Request::new(SessionRunRequest {
             session_id: session_id.to_string(),
             final_cycles: vec![20],
-            final_ucycles: vec![],
+            final_ucycles: vec![20],
         });
         let response = client.session_run(request).await?;
         if let Some(one_of) = response.into_inner().run_oneof {

@@ -19,12 +19,13 @@ pub fn steps() -> Steps<TestWorld> {
     let mut steps: Steps<TestWorld> = Steps::new();
 
     steps.given_regex_async(
-        r#"the write request executed for cycle (\d+), starting address (\d+) and data (.+)"#,
+        r#"the write request executed for cycle (\d+) and ucycle (\d+), starting address (\d+) and data (.+)"#,
         t!(|mut world, ctx| {
             let request = world.client_proxy.build_new_session_write_memory_request(
                 ctx.matches[1].parse::<u64>().unwrap(),
                 ctx.matches[2].parse::<u64>().unwrap(),
-                ctx.matches[3].as_bytes().to_vec(),
+                ctx.matches[3].parse::<u64>().unwrap(),
+                ctx.matches[4].as_bytes().to_vec(),
             );
             let cl = world.client_proxy.grpc_client.as_mut().unwrap();
             if let Err(e) = cl.session_write_memory(request).await {
@@ -35,12 +36,13 @@ pub fn steps() -> Steps<TestWorld> {
     );
 
     steps.when_regex_async(
-        r#"client asks server to read memory on cycle (\d+), starting on address (\d+) for length (\d+)"#,
+        r#"client asks server to read memory on cycle (\d+) and ucycle (\d+), starting on address (\d+) for length (\d+)"#,
     t!(|mut world, ctx| {
         let request = world.client_proxy.build_new_session_read_memory_request(
             ctx.matches[1].parse::<u64>().unwrap(),
             ctx.matches[2].parse::<u64>().unwrap(),
-            ctx.matches[3].parse::<u64>().unwrap());
+            ctx.matches[3].parse::<u64>().unwrap(),
+            ctx.matches[4].parse::<u64>().unwrap());
         match world.client_proxy.grpc_client.as_mut().unwrap().session_read_memory(request).await {
             Ok(val) => world.response.insert(String::from("response"), Box::new(val.into_inner())),
             Err(e) => world.response.insert(String::from("error"), Box::new(e)),
@@ -49,11 +51,12 @@ pub fn steps() -> Steps<TestWorld> {
     }));
 
     steps.when_regex_async(
-        r#"client asks server to write data (.+) on cycle (\d+), starting on address (\d+)"#,
+        r#"client asks server to write data (.+) on cycle (\d+) and ucycle (\d+) starting on address (\d+)"#,
         t!(|mut world, ctx| {
             let request = world.client_proxy.build_new_session_write_memory_request(
                 ctx.matches[2].parse::<u64>().unwrap(),
                 ctx.matches[3].parse::<u64>().unwrap(),
+                ctx.matches[4].parse::<u64>().unwrap(),
                 ctx.matches[1].as_bytes().to_vec(),
             );
             if let Err(e) = world

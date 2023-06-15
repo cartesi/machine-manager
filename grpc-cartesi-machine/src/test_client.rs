@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Root hash step 0 {:?}", hash);
 
     let access_log = grpc_machine
-        .step(
+        .step_uarch(
             &AccessLogType {
                 annotations: true,
                 proofs: true,

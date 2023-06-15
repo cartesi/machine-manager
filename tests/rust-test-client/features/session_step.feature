@@ -21,16 +21,16 @@ Feature: SessionStep feature
         #   cycle = initial cycle.
 
         Given machine manager server is up
-        And a machine manager server with a machine executed for <cycle> final cycles
-        When the machine manager server asks machine to step on initial cycle <cycle>
+        And a machine manager server with a machine executed for <cycle> final cycles and <ucycle> final ucycles
+        When the machine manager server asks machine to step on initial cycle <cycle> and ucycle <ucycle>
         Then server returns correct access log
 
         Examples:
-            | cycle |
-            |   1   |
-            |   21  |
-            |   35  |
-            |   30  |
+            | cycle | ucycle |
+            |   1   |   0    |
+            |   21  |   0    |
+            |   35  |   0    |
+            |   30  |   0    |
 
     Scenario Outline: step on invalid cycle
 
@@ -39,11 +39,11 @@ Feature: SessionStep feature
         # session cycle argument, return error. SessionRun request should be used to run machine to particular cycle.
 
         Given machine manager server is up
-        And a machine manager server with a machine executed for <cycle> final cycles
-        When the machine manager server asks machine to step on initial cycle <cycle>
+        And a machine manager server with a machine executed for <cycle> final cycles and <ucycle> final ucycles
+        When the machine manager server asks machine to step on initial cycle <cycle> and ucycle <ucycle>
         #Then machine manager server returns an Internal error
         Then server returns correct access log
 
         Examples:
-            | cycle |
-            |   20  |
+            | cycle | ucycle |
+            |   20  |   0    |  
