@@ -42,6 +42,9 @@ COPY ./cartesi-grpc-interfaces /root/cartesi-grpc-interfaces
 COPY ./grpc-cartesi-machine /root/grpc-cartesi-machine
 COPY ./machine-manager-server /root/machine-manager-server
 COPY ./tests /root/tests
+COPY ./cartesi-jsonrpc-interfaces /root/cartesi-jsonrpc-interfaces
+COPY ./jsonrpc-cartesi-machine /root/jsonrpc-cartesi-machine
+
 RUN cd /root/cartesi-grpc-interfaces && PATH="$PATH:$HOME/.local/bin" cargo build --release
 
 # Build grpc cartesi machine client

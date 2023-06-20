@@ -42,10 +42,16 @@ COPY ./cartesi-grpc-interfaces /root/cartesi-grpc-interfaces
 COPY ./grpc-cartesi-machine /root/grpc-cartesi-machine
 COPY ./machine-manager-server /root/machine-manager-server
 COPY ./tests /root/tests
+COPY ./cartesi-jsonrpc-interfaces /root/cartesi-jsonrpc-interfaces
+COPY ./jsonrpc-cartesi-machine /root/jsonrpc-cartesi-machine
+COPY ./test-files/rom.bin /root/rom.bin
+
 RUN cd /root/cartesi-grpc-interfaces && PATH="$PATH:$HOME/.local/bin" cargo build --release
 
 # Build grpc cartesi machine client
 RUN cd /root/grpc-cartesi-machine && PATH="$PATH:$HOME/.local/bin" cargo build --release
+
+RUN cd /root/jsonrpc-cartesi-machine && PATH="$PATH:$HOME/.local/bin" cargo build --release
 
 # Build machine manager server
 RUN cd /root/machine-manager-server && PATH="$PATH:$HOME/.local/bin" cargo build --release && PATH="$PATH:$HOME/.local/bin" cargo install --force --path . --root /root/cargo
@@ -59,6 +65,7 @@ LABEL maintainer="Marko Atanasievski <marko.atanasievski@cartesi.io>"
 ENV BASE /opt/cartesi
 ENV CARTESI_IMAGE_PATH $BASE/share/images
 ENV CARTESI_BIN_PATH $BASE/bin
+COPY --from=build-image /root/rom.bin $CARTESI_IMAGE_PATH/rom.bin
 
 # Install Rust and other dependencies
 RUN \
@@ -91,3 +98,21 @@ RUN apt-get update && apt-get install -y libc-ares2
 
 WORKDIR /root/tests/rust-test-client
 CMD [ "cargo", "test", "--release", "--", "--nocapture"]
+
+FROM build-image
+
+COPY --from=machine-manager-rust /opt/cartesi /opt/cartesi
+
+ENV BASE /opt/cartesi
+ENV CARTESI_IMAGE_PATH $BASE/share/images
+ENV CARTESI_BIN_PATH $BASE/bin
+ENV PROTOC /root/.local/bin/protoc
+
+RUN apt-get update && apt-get install -y libcrypto++8
+RUN apt-get update && apt-get install -y libboost-log1.74.0
+RUN apt-get update && apt-get install -y libc-ares2
+RUN apt-get update && apt-get install -y libb64-dev
+
+
+WORKDIR /root/jsonrpc-cartesi-machine/test
+CMD [ "cargo", "test", "--", "--nocapture", "--test-threads", "1"]
