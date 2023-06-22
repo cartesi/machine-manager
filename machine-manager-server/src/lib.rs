@@ -27,7 +27,6 @@ use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::{
     machine_request, CheckInRequest, Hash, MerkleTreeProof, Void,
 };
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::machine_manager_server::MachineManager;
-use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::session_run_response::RunOneof;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::session_step_request::StepParamsOneof;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::{
     EndSessionRequest, NewSessionRequest, SessionGetProofRequest, SessionReadMemoryRequest,
@@ -432,9 +431,10 @@ impl MachineManager for MachineManagerService {
         let request_info = SessionRequest::from(&request);
         let run_request = request.into_inner();
         log::info!(
-            "session id={} received session run request, final_cycles={:?}",
+            "session id={} received session run request, final_cycles={:?}, final_ucycles={:?}",
             &run_request.session_id,
-            &run_request.final_cycles
+            &run_request.final_cycles,
+            &run_request.final_ucycles,
         );
         let session_mut = self.find_session(&run_request.session_id).await?;
         if run_request.final_cycles.is_empty() {

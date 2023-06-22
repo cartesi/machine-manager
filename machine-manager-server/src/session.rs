@@ -17,11 +17,11 @@ use std::sync::Arc;
 
 use crate::server_manager::ServerManager;
 use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::{ Csr, RunResponse, RunUarchResponse, Void};
-use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::SessionRunProgress;
+use cartesi_grpc_interfaces::grpc_stubs::cartesi_machine_manager::SessionRunResult;
 use generic_array::GenericArray;
 use grpc_cartesi_machine::{
     CM_UARCH_BREAK_REASON_REACHED_TARGET_CYCLE, CM_UARCH_BREAK_REASON_HALTED,
-    GrpcCartesiMachineClient, MachineConfig, MachineRuntimeConfig, MerkleTreeProof, MemoryRangeConfig
+    GrpcCartesiMachineClient, MachineConfig, MachineRuntimeConfig, MerkleTreeProof
 };
 use sha3::{Digest, Sha3_256};
 use std::fmt::Debug;
@@ -64,28 +64,6 @@ enum SessionState {
     Active,
     Halted(u64),
     Closed,
-}
-
-/// Progress of the run job execution
-#[derive(Clone, Debug, Copy)]
-pub struct ExecutionProgress {
-    pub progress: u64,
-    pub application_progress: u64,
-    pub updated_at: u64,
-    pub cycle: u64,
-    pub halted: bool,
-}
-
-impl ExecutionProgress {
-    fn new() -> ExecutionProgress {
-        ExecutionProgress {
-            progress: 0,
-            application_progress: 0,
-            updated_at: chrono::Utc::now().timestamp() as u64,
-            cycle: 0,
-            halted: false,
-        }
-    }
 }
 
 /// Summary of the external machine manager client request
@@ -134,8 +112,8 @@ struct RunTask {
     request_id: String,
     /// Final cycles of the run task
     final_cycles: Vec<u64>,
-    /// Current progress
-    progress: ExecutionProgress,
+    /// Final ucycles of the run task
+    fina_ucycles: Vec<u64>,
     /// Hashes of the machine when it reaches final cycles
     hashes: Vec<grpc_cartesi_machine::Hash>,
     /// Summaries as RunResponse in the final cycles
@@ -143,12 +121,12 @@ struct RunTask {
 }
 
 impl RunTask {
-    fn new(request_id: &str, final_cycles: &[u64]) -> Self {
+    fn new(request_id: &str, final_cycles: &[u64], final_ucycles: &[u64]) -> Self {
         RunTask {
             id: format!("{:?}", final_cycles),
             request_id: request_id.to_string(),
             final_cycles: Vec::from(final_cycles),
-            progress: ExecutionProgress::new(),
+            fina_ucycles: Vec::from(final_ucycles),
             hashes: Vec::new(),
             summaries: Vec::new(),
         }
@@ -275,38 +253,6 @@ impl Session {
     /// Clear active client request
     pub fn clear_request(&mut self) {
         self.current_request = None;
-    }
-
-    /// Get execution progress of the run job currently processed
-    pub async fn get_job_progress(
-        &self,
-        request_id: &str,
-    ) -> Result<
-        (
-            ExecutionProgress,
-            Vec<grpc_cartesi_machine::Hash>,
-            Vec<RunResponse>,
-        ),
-        Box<dyn std::error::Error>,
-    > {
-        if let Some(current_job) = &self.current_job {
-            let current_task = current_job.job_task.lock().await;
-            if current_task.request_id != request_id {
-                return Err(Box::new(CartesiSessionError::new(&format!(
-                    "requesting progress for task id='{}', current task id='{}'",
-                    request_id, current_task.request_id
-                ))));
-            }
-            Ok((
-                current_task.progress,
-                current_task.hashes.clone(),
-                current_task.summaries.clone(),
-            ))
-        } else {
-            Err(Box::new(CartesiSessionError::new(
-                "no current task is running",
-            )))
-        }
     }
 
     /// Clear current run job
@@ -649,15 +595,14 @@ impl Session {
         Ok(())
     }
 
-    /// Run machine according to list of final cycles
+    /// Run machine according to list of final cycles and ucycles
     ///
     /// # Details
     /// * Perform rollback, run machine to initial cycle
     /// * Perform snapshot
-    /// * Spawn background task to run to cycles one by one
-    /// * Return initial progress status
+    /// * Spawn background task to run to cycles/ucycles one by one
     ///
-    /// Rollback/Snapshot again is performed if  snapshot_cycle < current session cycle or
+    /// Rollback/Snapshot again is performed if snapshot_cycle < current session cycle or
     /// current session cycle < first_job_cycle.
     ///
     /// When same run request comes from the user, return current progress
@@ -670,7 +615,7 @@ impl Session {
         request_id: &str,
         final_cycles: &[u64],
         final_ucycles: &[u64],
-    ) -> Result<SessionRunProgress, Box<dyn std::error::Error>> {
+    ) -> Result<Void, Box<dyn std::error::Error>> {
         log::debug!("got run request for final cycles {:?}", final_cycles);
         let mut session = session_mut.lock().await;
         if final_cycles.is_empty() {
@@ -727,14 +672,7 @@ impl Session {
 
                     session.current_job = Some(Job {
                         job_task: {
-                            let mut new_run_task = RunTask::new(request_id, final_cycles);
-                            new_run_task.progress = ExecutionProgress {
-                                application_progress: 0,
-                                progress: 100,
-                                cycle: initial_run_response.0.mcycle,
-                                updated_at: chrono::Utc::now().timestamp() as u64,
-                                halted: false,
-                            };
+                            let mut new_run_task = RunTask::new(request_id, final_cycles, final_ucycles);
                             new_run_task.hashes.push(current_root_hash);
                             new_run_task.summaries.push(initial_run_response.0);
                             Arc::new(Mutex::new(new_run_task))
@@ -742,17 +680,11 @@ impl Session {
                         job_handle: None,
                     });
 
-                    return Ok(SessionRunProgress {
-                        cycle: session.cycle,
-                        ucycle: 0,
-                        progress: 100,
-                        updated_at: chrono::Utc::now().timestamp() as u64,
-                        application_progress: 0,
-                    });
+                    return Ok(Void{});
                 }
 
                 // Execution of the run job task in separate thread
-                let new_run_task = Arc::new(Mutex::new(RunTask::new(request_id, final_cycles)));
+                let new_run_task = Arc::new(Mutex::new(RunTask::new(request_id, final_cycles, final_ucycles)));
                 // Closure that will run task in separate thread
                 let task_closure = {
                     let task_final_cycles = Vec::from(final_cycles);
@@ -806,14 +738,6 @@ impl Session {
                                         Ok(response) => {
                                             let mut current_task = run_task.lock().await;
                                             let is_halted = response.0.iflags_h;
-                                            if response.0.iflags_y {
-                                                //todo how to calculate application progress?
-                                                //let _cmd = response.tohost[1];
-                                                current_task.progress.application_progress = 0;
-                                            }
-                                            current_task.progress.progress = (((task_session.cycle-first_cycle) as f32/ total_cycles as f32) * 100.0) as u64;
-                                            current_task.progress.cycle = task_session.cycle;
-                                            current_task.progress.updated_at = chrono::Utc::now().timestamp() as u64;
                                             current_task.summaries.push(response.0);
                                             match task_session.get_root_hash().await {
                                                 Ok(hash) => current_task.hashes.push(hash),
@@ -822,7 +746,6 @@ impl Session {
                                                 }
                                             };
                                             if is_halted {
-                                                current_task.progress.halted = true;
                                                 if &task_final_cycles.len() > &current_task.hashes.len() {
                                                     let last_hash = current_task.hashes.get(current_task.hashes.len()-1).unwrap().clone();
                                                     for _ in 1..&task_final_cycles.len() - current_task.hashes.len() {
@@ -830,18 +753,16 @@ impl Session {
                                                     }
                                                 }
                                                 log::debug!(
-                                                    "running task id {} progress: {}, session_id {}, curent cycle {} machine HALTED",
+                                                    "running task id {}: session_id {}, curent cycle {} machine HALTED",
                                                     &current_task.id,
-                                                    current_task.progress.progress,
                                                     &task_session.id,
                                                     &task_session.cycle
                                                 );
                                                 break;
                                             }
                                             log::debug!(
-                                                "running task id {} increasing progress: {}, session_id {}, current cycle {}",
+                                                "running task id {}: session_id {}, current cycle {}",
                                                 &current_task.id,
-                                                current_task.progress.progress,
                                                 &task_session.id,
                                                 &task_session.cycle
                                             );
@@ -873,15 +794,7 @@ impl Session {
                 &session.id
             ))));
         }
-        // Return current execution progress
-        let (execution_progress, ..) = session.get_job_progress(request_id).await?;
-        Ok(SessionRunProgress {
-            cycle: execution_progress.cycle,
-            ucycle: 0,
-            progress: execution_progress.progress,
-            updated_at: execution_progress.updated_at,
-            application_progress: execution_progress.application_progress,
-        })
+        return Ok(Void{});
     }
 
     pub async fn run_defective(
@@ -889,7 +802,7 @@ impl Session {
         request_id: &str,
         final_cycles: &[u64],
         final_ucycles: &[u64],
-    ) -> Result<SessionRunProgress, Box<dyn std::error::Error>> {
+    ) -> Result<Void, Box<dyn std::error::Error>> {
 
         let mut modified_cycles: Vec<u64> = Vec::new();
         for cycle in final_cycles {
@@ -923,28 +836,7 @@ impl Session {
             modified_cycles, final_cycles
         );
 
-        match session_run_result.await{
-            Ok(session_result) => {
-
-                let session_result = SessionRunProgress {
-                    progress: session_result.progress,
-                    application_progress: session_result.application_progress,
-                    updated_at: session_result.updated_at,
-                    cycle: final_cycles[0],
-                    ucycle: 0,
-                };
-
-                log::debug!(
-                    "Final response is: {:?}",
-                    session_result
-                );
-                Ok(session_result)
-            },
-            Err(e) => {
-                Err(e)
-            }
-        }
-
+        return session_run_result.await
     }
 
     pub async fn step_defective(
@@ -1136,6 +1028,29 @@ impl Session {
             self.state = SessionState::Closed;
         }
         Ok(())
+    }
+
+    pub async fn get_current_job_result(
+        &self,
+        request_id: &str,
+    ) -> Result<SessionRunResult, Box<dyn std::error::Error>> {
+        if let Some(current_job) = &self.current_job {
+            let current_task = current_job.job_task.lock().await;
+            if current_task.request_id != request_id {
+                return Err(Box::new(CartesiSessionError::new(&format!(
+                    "requesting progress for task id='{}', current task id='{}'",
+                    request_id, current_task.request_id
+                ))));
+            }
+            Ok(SessionRunResult{
+                hashes: current_task.hashes.iter().map(cartesi_grpc_interfaces::grpc_stubs::cartesi_machine::Hash::from).collect(),
+                summaries: current_task.summaries.clone(),
+            })
+        } else {
+            Err(Box::new(CartesiSessionError::new(
+                "no current task is running",
+            )))
+        }
     }
 }
 
